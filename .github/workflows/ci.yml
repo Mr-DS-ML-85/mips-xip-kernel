@@ -1,0 +1,46 @@
+name: build-and-boot-test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  xip-kernel:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain (clang + MIPS binutils + QEMU)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang llvm lld binutils-mipsel-linux-gnu \
+            qemu-system-mips flex bison bc cpio xz-utils \
+            libssl-dev libelf-dev
+
+      - name: Cache kernel tarball
+        uses: actions/cache@v4
+        with:
+          path: build/linux-6.12.34.tar.xz
+          key: linux-6.12.34-tarball
+
+      - name: Build kernel + flash image
+        run: make
+
+      - name: Verify XIP layout (readelf + System.map assertions)
+        run: make verify
+
+      - name: Boot smoke test in QEMU
+        run: make test
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xip-artifacts
+          path: |
+            build/out/xip-bios.bin
+            build/out/boot.log
+          if-no-files-found: ignore

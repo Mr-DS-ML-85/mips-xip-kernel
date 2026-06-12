@@ -1,0 +1,6 @@
+/build/
+/pristine/
+*.o
+*.elf
+*.bin
+boot.log

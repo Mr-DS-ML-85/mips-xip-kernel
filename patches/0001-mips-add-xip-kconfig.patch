@@ -1,0 +1,53 @@
+From: Irfan <irfan@localhost>
+Subject: [PATCH 1/5] MIPS: Add CONFIG_XIP_KERNEL and CONFIG_XIP_PHYS_ADDR Kconfig options
+
+Add the Kconfig plumbing for Execute-In-Place kernels on MIPS,
+modeled on the ARM and RISC-V options. XIP keeps .text/.rodata/
+.init.text in the (KSEG0-addressable) flash window and copies only
+writable data to RAM, freeing the RAM that kernel text would occupy.
+
+Restricted to 32BIT && !RELOCATABLE && !MAPPED_KERNEL && !SMP:
+KSEG0 is an unmapped segment, so flash below 512 MiB is directly
+CPU-addressable and no page-table fixups are needed (cf. RISC-V
+xip_fixup.h), but the kernel must be linked at a fixed address.
+---
+--- a/arch/mips/Kconfig
++++ b/arch/mips/Kconfig
+@@ -2610,6 +2610,37 @@
+ config SYS_SUPPORTS_NUMA
+ 	bool
+ 
++config XIP_KERNEL
++	bool "Kernel Execute-In-Place from ROM"
++	depends on 32BIT && !RELOCATABLE && !MAPPED_KERNEL && !SMP
++	help
++	  Execute-In-Place allows the kernel to run from non-volatile
++	  storage directly addressable by the CPU, such as NOR flash.
++	  The kernel text section is kept in ROM (linked at the KSEG0
++	  view of the flash window) and only the writable data sections
++	  are copied to RAM by head.S at boot.
++
++	  Unlike ARM/RISC-V, MIPS needs no page-table fixups for this:
++	  KSEG0/KSEG1 are unmapped segments, so flash below 512 MiB is
++	  directly CPU-addressable.
++
++	  The kernel image cannot be compressed and flash wear/latency
++	  make this slower than running from RAM, but it saves the RAM
++	  the text/rodata would occupy.
++
++	  If unsure, say N.
++
++config XIP_PHYS_ADDR
++	hex "XIP kernel physical location"
++	depends on XIP_KERNEL
++	default "0x1fc01000"
++	help
++	  Physical address of the flash region the XIP kernel is stored
++	  in. Must be below 512 MiB so it is visible through KSEG0, and
++	  must match where the image is actually programmed. The default
++	  leaves 4 KiB at the start of the QEMU Malta boot flash
++	  (0x1fc00000) for a small bootstrap shim.
++
+ config RELOCATABLE
+ 	bool "Relocatable kernel"
+ 	depends on SYS_SUPPORTS_RELOCATABLE

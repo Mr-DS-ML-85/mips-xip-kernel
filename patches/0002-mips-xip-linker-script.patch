@@ -1,0 +1,293 @@
+From: Irfan <irfan@localhost>
+Subject: [PATCH 2/5] MIPS: Add XIP kernel linker script
+
+vmlinux-xip.lds.S places a ROM region (VMA = LMA = KSEG0 view of
+CONFIG_XIP_PHYS_ADDR: .text, build-time-sorted __ex_table, .rodata,
+.init.text) and a RAM region (VMA = LINKER_LOAD_ADDRESS, LMA appended
+in ROM at __data_loc). The asm-generic macros hardcode
+AT(ADDR(x) - LOAD_OFFSET) which silently resets RAM-section LMAs, so
+INIT_DATA_SECTION and BUG_TABLE are hand-expanded with XIP_AT().
+
+.data..ro_after_init is written during init so it moves to RAM .data;
+__dbe_table is sorted at runtime by trap_init() so it stays in RAM,
+unlike __ex_table (MIPS selects BUILDTIME_TABLE_SORT).
+---
+--- /dev/null
++++ b/arch/mips/kernel/vmlinux-xip.lds.S
+@@ -0,0 +1,261 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Linker script for MIPS XIP (Execute-In-Place) kernels.
++ *
++ * Included from vmlinux.lds.S when CONFIG_XIP_KERNEL=y; modeled on
++ * arch/arm/kernel/vmlinux-xip.lds.S and arch/riscv XIP support.
++ *
++ * Layout:
++ *   ROM region — VMA = LMA = KSEG0 view of CONFIG_XIP_PHYS_ADDR:
++ *	.text, __ex_table (build-time sorted: MIPS selects
++ *	BUILDTIME_TABLE_SORT), .rodata (minus .data..ro_after_init),
++ *	.init.text, .exit.text — everything that is never written at
++ *	runtime. Executed/read directly from flash.
++ *   RAM region — VMA = LINKER_LOAD_ADDRESS, LMA appended in ROM at
++ *	__data_loc: everything writable — .data (incl. ro_after_init),
++ *	__dbe_table (sorted at *runtime* by trap_init), BUG_TABLE,
++ *	small-data, init data (incl. the built-in DTB, which
++ *	malta-dtshim patches in place), then .bss.
++ *	head.S copies [_sdata, __init_end) from __data_loc before use.
++ *
++ * No page-table fixups are needed (cf. RISC-V's xip_fixup.h): KSEG0 is
++ * an unmapped segment, so flash physical addresses below 512 MiB are
++ * directly CPU-addressable at a fixed virtual address.
++ */
++#include <asm/asm-offsets.h>
++#include <asm/thread_info.h>
++
++#define PAGE_SIZE _PAGE_SIZE
++
++/*
++ * .data..ro_after_init *is written* during init, so for XIP it must
++ * live in RAM: suppress it here and place it by hand inside .data.
++ */
++#define RO_AFTER_INIT_DATA
++
++/*
++ * Put .bss..swapper_pg_dir as the first thing in .bss. This will
++ * ensure that it has .bss alignment (64K).
++ */
++#define BSS_FIRST_SECTIONS *(.bss..swapper_pg_dir)
++
++#define RUNTIME_DISCARD_EXIT
++
++#include <asm-generic/vmlinux.lds.h>
++
++/* KSEG0 (cached, unmapped) view of the flash window. */
++#define XIP_VIRT_ADDR	(0x80000000 + CONFIG_XIP_PHYS_ADDR)
++
++/*
++ * LMA of a RAM-region section inside the ROM blob that starts at
++ * __data_loc. Every RAM output section must use this explicitly:
++ * the asm-generic helpers (BUG_TABLE, INIT_DATA_SECTION, ...) hardcode
++ * AT(ADDR(x) - LOAD_OFFSET) with LOAD_OFFSET=0, which would silently
++ * put their load address back in (nonexistent) RAM, so those macros
++ * are hand-expanded below with XIP_AT() instead.
++ */
++#define XIP_AT(sect)	AT(__data_loc + (ADDR(sect) - _sdata))
++
++#undef mips
++#define mips mips
++OUTPUT_ARCH(mips)
++ENTRY(kernel_entry)
++
++#ifdef CONFIG_32BIT
++	#ifdef CONFIG_CPU_LITTLE_ENDIAN
++		jiffies	 = jiffies_64;
++	#else
++		jiffies	 = jiffies_64 + 4;
++	#endif
++#else
++	jiffies	 = jiffies_64;
++#endif
++
++SECTIONS
++{
++	/* ---------------- ROM region: VMA = LMA, execute in place ---- */
++	. = XIP_VIRT_ADDR;
++	_xiprom = .;
++	_text = .;	/* Text and read-only data */
++	.text : {
++		TEXT_TEXT
++		SCHED_TEXT
++		LOCK_TEXT
++		KPROBES_TEXT
++		IRQENTRY_TEXT
++		SOFTIRQENTRY_TEXT
++		*(.fixup)
++		*(.gnu.warning)
++		. = ALIGN(16);
++		*(.got)	/* Global offset table */
++	}
++	_etext = .;	/* End of text section */
++
++	/* Build-time sorted (BUILDTIME_TABLE_SORT) — safe in ROM. */
++	EXCEPTION_TABLE(16)
++
++	RO_DATA(4096)
++
++	/*
++	 * Init *text* stays in ROM and is simply never reclaimed;
++	 * __init_begin/__init_end below only bound the RAM-resident
++	 * init data, so free_initmem() works unmodified.
++	 */
++	INIT_TEXT_SECTION(PAGE_SIZE)
++
++	/* .exit.text is discarded at runtime, not link time, to deal with
++	 * references from .rodata
++	 */
++	.exit.text : {
++		EXIT_TEXT
++	}
++
++	. = ALIGN(16);
++	__data_loc = .;		/* Flash load address (LMA) of .data */
++	_exiprom = __data_loc + (__init_end - _sdata);	/* End of ROM image */
++
++	/* ------------- RAM region: copied from __data_loc by head.S - */
++	. = LINKER_LOAD_ADDRESS;
++	_sdata = .;			/* Start of data section */
++
++	.data : AT(__data_loc) {	/* Data */
++		/* Runtime-generated (uasm) TLB handler code buffers from
++		 * mm/tlb-funcs.S — patchable, so RAM, not ROM.
++		 */
++		. = ALIGN(8);
++		*(.data..xip_patchable_text)
++
++		INIT_TASK_DATA(THREAD_SIZE)
++		NOSAVE_DATA
++		PAGE_ALIGNED_DATA(PAGE_SIZE)
++		CACHELINE_ALIGNED_DATA(1 << CONFIG_MIPS_L1_CACHE_SHIFT)
++		READ_MOSTLY_DATA(1 << CONFIG_MIPS_L1_CACHE_SHIFT)
++		DATA_DATA
++		CONSTRUCTORS
++
++		/* Suppressed in RO_DATA above; written during init. */
++		. = ALIGN(8);
++		__start_ro_after_init = .;
++		*(.data..ro_after_init)
++		JUMP_TABLE_DATA
++		STATIC_CALL_DATA
++		__end_ro_after_init = .;
++	}
++
++	/* Exception table for data bus errors — sorted at *runtime* by
++	 * trap_init(), so unlike __ex_table it must live in RAM.
++	 */
++	__dbe_table : XIP_AT(__dbe_table) {
++		__start___dbe_table = .;
++		KEEP(*(__dbe_table))
++		__stop___dbe_table = .;
++	}
++
++#ifdef CONFIG_GENERIC_BUG
++	/* BUG_TABLE, hand-expanded for the XIP load address. */
++	. = ALIGN(8);
++	__bug_table : XIP_AT(__bug_table) {
++		BOUNDED_SECTION_BY(__bug_table, ___bug_table)
++	}
++#endif
++	_gp = . + 0x8000;
++	.lit8 : XIP_AT(.lit8) {
++		*(.lit8)
++	}
++	.lit4 : XIP_AT(.lit4) {
++		*(.lit4)
++	}
++	/* We want the small data sections together, so single-instruction offsets
++	   can access them all, and initialized data all before uninitialized, so
++	   we can shorten the on-disk segment size.  */
++	.sdata : XIP_AT(.sdata) {
++		*(.sdata)
++	}
++	_edata =  .;			/* End of data section */
++
++	/* Init *data* — freed after init; must be RAM.
++	 * INIT_DATA_SECTION(16), hand-expanded for the XIP load address.
++	 */
++	. = ALIGN(PAGE_SIZE);
++	__init_begin = .;
++	.init.data : XIP_AT(.init.data) {
++		INIT_DATA
++		INIT_SETUP(16)
++		INIT_CALLS
++		CON_INITCALL
++		INIT_RAM_FS
++	}
++
++	. = ALIGN(4);
++	.mips.machines.init : XIP_AT(.mips.machines.init) {
++		__mips_machines_start = .;
++		KEEP(*(.mips.machines.init))
++		__mips_machines_end = .;
++	}
++
++	.exit.data : XIP_AT(.exit.data) {
++		EXIT_DATA
++	}
++
++	.rel.dyn : XIP_AT(.rel.dyn) ALIGN(8) {
++		*(.rel)
++		*(.rel*)
++	}
++
++	/*
++	 * Align to 64K in attempt to eliminate holes before the
++	 * .bss..swapper_pg_dir section at the start of .bss.  This
++	 * also satisfies PAGE_SIZE alignment as the largest page size
++	 * allowed is 64K.
++	 */
++	. = ALIGN(0x10000);
++	__init_end = .;
++	/* freed after init ends here */
++
++	/*
++	 * Force .bss to 64K alignment so that .bss..swapper_pg_dir
++	 * gets that alignment.	 .sbss should be empty, so there will be
++	 * no holes after __init_end. */
++	BSS_SECTION(0, 0x10000, 8)
++
++	_end = . ;
++
++	/* These mark the ABI of the kernel for debuggers.  */
++	.mdebug.abi32 : {
++		KEEP(*(.mdebug.abi32))
++	}
++	.mdebug.abi64 : {
++		KEEP(*(.mdebug.abi64))
++	}
++
++	/* This is the MIPS specific mdebug section.  */
++	.mdebug : {
++		*(.mdebug)
++	}
++
++	STABS_DEBUG
++	DWARF_DEBUG
++	ELF_DETAILS
++
++	/* These must appear regardless of  .  */
++	.gptab.sdata : {
++		*(.gptab.data)
++		*(.gptab.sdata)
++	}
++	.gptab.sbss : {
++		*(.gptab.bss)
++		*(.gptab.sbss)
++	}
++
++	/* Sections to be discarded */
++	DISCARDS
++	/DISCARD/ : {
++		/* ABI crap starts here */
++		*(.MIPS.abiflags)
++		*(.MIPS.options)
++		*(.gnu.attributes)
++		*(.options)
++		*(.pdr)
++		*(.reginfo)
++	}
++}
+--- a/arch/mips/kernel/vmlinux.lds.S
++++ b/arch/mips/kernel/vmlinux.lds.S
+@@ -1,4 +1,7 @@
+ /* SPDX-License-Identifier: GPL-2.0 */
++#ifdef CONFIG_XIP_KERNEL
++#include "vmlinux-xip.lds.S"
++#else
+ #include <asm/asm-offsets.h>
+ #include <asm/thread_info.h>
+ 
+@@ -240,3 +243,4 @@
+ 		*(.reginfo)
+ 	}
+ }
++#endif /* CONFIG_XIP_KERNEL */

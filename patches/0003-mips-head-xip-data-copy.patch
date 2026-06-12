@@ -1,0 +1,36 @@
+From: Irfan <irfan@localhost>
+Subject: [PATCH 3/5] MIPS: head.S: copy writable data from ROM on XIP boot
+
+Before touching .bss or storing the firmware arguments, copy
+[_sdata, __init_end) from its flash load address (__data_loc) to its
+RAM link address. Mirrors what arm/riscv XIP heads do.
+---
+--- a/arch/mips/kernel/head.S
++++ b/arch/mips/kernel/head.S
+@@ -93,6 +93,26 @@
+ 	jr	t0
+ 0:
+ 
++#ifdef CONFIG_XIP_KERNEL
++	/*
++	 * The writable sections [_sdata, __init_end) live in RAM but are
++	 * loaded in ROM at __data_loc (see vmlinux-xip.lds.S): copy them
++	 * out of flash before anything touches RAM — this must precede
++	 * both the .bss clear and the fw_argN stores below.
++	 */
++	PTR_LA		t0, __data_loc		# source (flash LMA)
++	PTR_LA		t1, _sdata		# destination (RAM VMA)
++	PTR_LA		t2, __init_end
++	beq		t1, t2, 9f
++8:
++	LONG_L		t3, (t0)
++	LONG_S		t3, (t1)
++	PTR_ADDIU	t0, LONGSIZE
++	PTR_ADDIU	t1, LONGSIZE
++	bne		t1, t2, 8b
++9:
++#endif /* CONFIG_XIP_KERNEL */
++
+ 	PTR_LA		t0, __bss_start		# clear .bss
+ 	LONG_S		zero, (t0)
+ 	PTR_LA		t1, __bss_stop - LONGSIZE

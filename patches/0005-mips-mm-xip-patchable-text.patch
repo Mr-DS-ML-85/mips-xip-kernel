@@ -1,0 +1,265 @@
+From: Irfan <irfan@localhost>
+Subject: [PATCH 5/5] MIPS: mm: move runtime-patched uasm buffers to RAM for XIP
+
+The TLB handlers (handle_tlbl/s/m, tlbmiss_handler_setup_pgd) and
+clear_page/copy_page are uasm-generated at boot into .text buffers.
+Under XIP .text is ROM: the patch writes are silently dropped and the
+placeholder "j 1b" spins forever. Move the buffers to a new RAM
+section .data..xip_patchable_text (KSEG0 has no per-page execute
+permissions, so RAM-resident code is executable).
+
+Callers reach them through ROM trampolines (PTR_LA t9 + jr) because
+jal/R_MIPS_26 cannot cross the 256 MiB jump segment between the flash
+window (0x9fcxxxxx) and RAM (0x80xxxxxx). For the same reason the
+generated absolute jumps to tlb_do_page_fault_0/1 become
+lui/addiu/jr via build_tlb_fault_jump().
+---
+--- a/arch/mips/mm/tlb-funcs.S
++++ b/arch/mips/mm/tlb-funcs.S
+@@ -17,12 +17,45 @@
+ 
+ #define FASTPATH_SIZE	128
+ 
++#ifdef CONFIG_XIP_KERNEL
++/*
++ * These are not real functions but buffers that mm/tlbex.c fills with
++ * runtime-generated (uasm) handler code. With an XIP kernel, .text
++ * executes in place from ROM and cannot be written to, so the patchable
++ * buffers must live in the RAM data region (placed in .data by
++ * vmlinux-xip.lds.S). KSEG0 is not subject to per-page execute
++ * protection, so executing them from there is fine.
++ *
++ * tlbmiss_handler_setup_pgd is additionally *called directly* (jal)
++ * from C code, and the RAM buffer usually sits in a different 256 MiB
++ * jump segment than the flash-resident callers, out of jal's reach:
++ * keep a register-jump trampoline in .text under the original symbol.
++ * mm/tlbex.c generates the real code into xip_tlbmiss_handler_setup_pgd.
++ * handle_tlb{l,s,m} are only ever dispatched indirectly through
++ * exception_handlers[], so they need no trampolines.
++ */
++LEAF(tlbmiss_handler_setup_pgd)
++	PTR_LA	t9, xip_tlbmiss_handler_setup_pgd
++	jr	t9
++END(tlbmiss_handler_setup_pgd)
++EXPORT_SYMBOL_GPL(tlbmiss_handler_setup_pgd)
++
++	.section .data..xip_patchable_text, "aw", @progbits
++	.balign	8
++
++LEAF(xip_tlbmiss_handler_setup_pgd)
++1:	j	1b		/* Dummy, will be replaced. */
++	.space	64
++END(xip_tlbmiss_handler_setup_pgd)
++EXPORT(tlbmiss_handler_setup_pgd_end)
++#else
+ LEAF(tlbmiss_handler_setup_pgd)
+ 1:	j	1b		/* Dummy, will be replaced. */
+ 	.space	64
+ END(tlbmiss_handler_setup_pgd)
+ EXPORT(tlbmiss_handler_setup_pgd_end)
+ EXPORT_SYMBOL_GPL(tlbmiss_handler_setup_pgd)
++#endif
+ 
+ LEAF(handle_tlbm)
+ 	.space		FASTPATH_SIZE * 4
+--- a/arch/mips/mm/page-funcs.S
++++ b/arch/mips/mm/page-funcs.S
+@@ -28,6 +28,29 @@
+  * R4600 v2.0:				0x060 bytes
+  * With prefetching, 16 word strides	0x120 bytes
+  */
++#ifdef CONFIG_XIP_KERNEL
++/*
++ * These buffers are filled with runtime-generated (uasm) code by
++ * mm/page.c. With an XIP kernel, .text executes in place from ROM and
++ * cannot be written to, so the patchable buffers live in the RAM data
++ * region (.data..xip_patchable_text, placed by vmlinux-xip.lds.S),
++ * while register-jump trampolines under the original symbols stay in
++ * .text within jal range of their direct callers.
++ */
++LEAF(cpu_clear_page_function_name)
++EXPORT_SYMBOL(cpu_clear_page_function_name)
++	PTR_LA	t9, __clear_page_start
++	jr	t9
++END(cpu_clear_page_function_name)
++
++	.pushsection .data..xip_patchable_text, "aw", @progbits
++	.balign	8
++EXPORT(__clear_page_start)
++1:	j	1b		/* Dummy, will be replaced. */
++	.space 288
++EXPORT(__clear_page_end)
++	.popsection
++#else
+ EXPORT(__clear_page_start)
+ LEAF(cpu_clear_page_function_name)
+ EXPORT_SYMBOL(cpu_clear_page_function_name)
+@@ -35,6 +58,7 @@
+ 	.space 288
+ END(cpu_clear_page_function_name)
+ EXPORT(__clear_page_end)
++#endif
+ 
+ /*
+  * Maximum sizes:
+@@ -44,6 +68,21 @@
+  * R4600 v2.0:				0x07c bytes
+  * With prefetching, 16 word strides	0x540 bytes
+  */
++#ifdef CONFIG_XIP_KERNEL
++LEAF(cpu_copy_page_function_name)
++EXPORT_SYMBOL(cpu_copy_page_function_name)
++	PTR_LA	t9, __copy_page_start
++	jr	t9
++END(cpu_copy_page_function_name)
++
++	.pushsection .data..xip_patchable_text, "aw", @progbits
++	.balign	8
++EXPORT(__copy_page_start)
++1:	j	1b		/* Dummy, will be replaced. */
++	.space 1344
++EXPORT(__copy_page_end)
++	.popsection
++#else
+ EXPORT(__copy_page_start)
+ LEAF(cpu_copy_page_function_name)
+ EXPORT_SYMBOL(cpu_copy_page_function_name)
+@@ -51,3 +90,4 @@
+ 	.space 1344
+ END(cpu_copy_page_function_name)
+ EXPORT(__copy_page_end)
++#endif
+--- a/arch/mips/mm/tlbex.c
++++ b/arch/mips/mm/tlbex.c
+@@ -39,6 +39,41 @@
+ #include <asm/setup.h>
+ #include <asm/tlbex.h>
+ 
++#ifdef CONFIG_XIP_KERNEL
++/*
++ * With an XIP kernel the runtime-patchable handler buffers live in RAM
++ * (.data..xip_patchable_text, see mm/tlb-funcs.S) because kernel .text
++ * executes in place from ROM and cannot be written. The C-visible
++ * tlbmiss_handler_setup_pgd symbol is just a .text trampoline for its
++ * direct (jal) callers; the code must be generated into the RAM buffer.
++ */
++extern u32 xip_tlbmiss_handler_setup_pgd[];
++#define tlbmiss_handler_setup_pgd_buf	((void *)xip_tlbmiss_handler_setup_pgd)
++#else
++#define tlbmiss_handler_setup_pgd_buf	((void *)tlbmiss_handler_setup_pgd)
++#endif
++
++/*
++ * Tail-jump from a runtime-generated TLB handler to the C slow path.
++ * With an XIP kernel the generated code runs from a RAM buffer while
++ * tlb_do_page_fault_* sit in flash-resident .text — a different 256 MiB
++ * jump segment, which an absolute j cannot encode. Use a register jump
++ * instead; GPR_K0 is dead after build_restore_work_registers() (cf. the
++ * CONFIG_CPU_MICROMIPS variants at the call sites).
++ */
++static void build_tlb_fault_jump(u32 **p, unsigned long target)
++{
++	if (IS_ENABLED(CONFIG_XIP_KERNEL)) {
++		uasm_i_lui(p, GPR_K0, uasm_rel_hi((long)target));
++		uasm_i_addiu(p, GPR_K0, GPR_K0, uasm_rel_lo((long)target));
++		uasm_i_jr(p, GPR_K0);
++		uasm_i_nop(p);
++	} else {
++		uasm_i_j(p, target & 0x0fffffff);
++		uasm_i_nop(p);
++	}
++}
++
+ static int mips_xpa_disabled;
+ 
+ static int __init xpa_disable(char *s)
+@@ -1535,7 +1570,7 @@
+ 	const int a0 = 4;
+ 	const int __maybe_unused a1 = 5;
+ 	const int __maybe_unused a2 = 6;
+-	u32 *p = (u32 *)msk_isa16_mode((ulong)tlbmiss_handler_setup_pgd);
++	u32 *p = (u32 *)msk_isa16_mode((ulong)tlbmiss_handler_setup_pgd_buf);
+ #ifndef CONFIG_MIPS_PGD_C0_CONTEXT
+ 	long pgdc = (long)pgd_current;
+ #endif
+@@ -1603,9 +1638,9 @@
+ 
+ 	uasm_resolve_relocs(relocs, labels);
+ 	pr_debug("Wrote tlbmiss_handler_setup_pgd (%u instructions).\n",
+-		 (unsigned int)(p - (u32 *)tlbmiss_handler_setup_pgd));
++		 (unsigned int)(p - (u32 *)tlbmiss_handler_setup_pgd_buf));
+ 
+-	dump_handler("tlbmiss_handler", tlbmiss_handler_setup_pgd,
++	dump_handler("tlbmiss_handler", tlbmiss_handler_setup_pgd_buf,
+ 					tlbmiss_handler_setup_pgd_end);
+ }
+ 
+@@ -1892,8 +1927,7 @@
+ 	build_r3000_tlb_reload_write(&p, &l, &r, GPR_K0, GPR_K1);
+ 
+ 	uasm_l_nopage_tlbl(&l, p);
+-	uasm_i_j(&p, (unsigned long)tlb_do_page_fault_0 & 0x0fffffff);
+-	uasm_i_nop(&p);
++	build_tlb_fault_jump(&p, (unsigned long)tlb_do_page_fault_0);
+ 
+ 	if (p >= (u32 *)handle_tlbl_end)
+ 		panic("TLB load handler fastpath space exceeded");
+@@ -1922,8 +1956,7 @@
+ 	build_r3000_tlb_reload_write(&p, &l, &r, GPR_K0, GPR_K1);
+ 
+ 	uasm_l_nopage_tlbs(&l, p);
+-	uasm_i_j(&p, (unsigned long)tlb_do_page_fault_1 & 0x0fffffff);
+-	uasm_i_nop(&p);
++	build_tlb_fault_jump(&p, (unsigned long)tlb_do_page_fault_1);
+ 
+ 	if (p >= (u32 *)handle_tlbs_end)
+ 		panic("TLB store handler fastpath space exceeded");
+@@ -1952,8 +1985,7 @@
+ 	build_r3000_pte_reload_tlbwi(&p, GPR_K0, GPR_K1);
+ 
+ 	uasm_l_nopage_tlbm(&l, p);
+-	uasm_i_j(&p, (unsigned long)tlb_do_page_fault_1 & 0x0fffffff);
+-	uasm_i_nop(&p);
++	build_tlb_fault_jump(&p, (unsigned long)tlb_do_page_fault_1);
+ 
+ 	if (p >= (u32 *)handle_tlbm_end)
+ 		panic("TLB modify handler fastpath space exceeded");
+@@ -2220,8 +2252,7 @@
+ 		uasm_i_jr(&p, GPR_K0);
+ 	} else
+ #endif
+-	uasm_i_j(&p, (unsigned long)tlb_do_page_fault_0 & 0x0fffffff);
+-	uasm_i_nop(&p);
++	build_tlb_fault_jump(&p, (unsigned long)tlb_do_page_fault_0);
+ 
+ 	if (p >= (u32 *)handle_tlbl_end)
+ 		panic("TLB load handler fastpath space exceeded");
+@@ -2276,8 +2307,7 @@
+ 		uasm_i_jr(&p, GPR_K0);
+ 	} else
+ #endif
+-	uasm_i_j(&p, (unsigned long)tlb_do_page_fault_1 & 0x0fffffff);
+-	uasm_i_nop(&p);
++	build_tlb_fault_jump(&p, (unsigned long)tlb_do_page_fault_1);
+ 
+ 	if (p >= (u32 *)handle_tlbs_end)
+ 		panic("TLB store handler fastpath space exceeded");
+@@ -2333,8 +2363,7 @@
+ 		uasm_i_jr(&p, GPR_K0);
+ 	} else
+ #endif
+-	uasm_i_j(&p, (unsigned long)tlb_do_page_fault_1 & 0x0fffffff);
+-	uasm_i_nop(&p);
++	build_tlb_fault_jump(&p, (unsigned long)tlb_do_page_fault_1);
+ 
+ 	if (p >= (u32 *)handle_tlbm_end)
+ 		panic("TLB modify handler fastpath space exceeded");
+@@ -2354,7 +2383,7 @@
+ 			   (unsigned long)handle_tlbs_end);
+ 	local_flush_icache_range((unsigned long)handle_tlbm,
+ 			   (unsigned long)handle_tlbm_end);
+-	local_flush_icache_range((unsigned long)tlbmiss_handler_setup_pgd,
++	local_flush_icache_range((unsigned long)tlbmiss_handler_setup_pgd_buf,
+ 			   (unsigned long)tlbmiss_handler_setup_pgd_end);
+ }
+ 

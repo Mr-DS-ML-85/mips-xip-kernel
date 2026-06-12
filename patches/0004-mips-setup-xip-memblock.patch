@@ -1,0 +1,52 @@
+From: Irfan <irfan@localhost>
+Subject: [PATCH 4/5] MIPS: setup.c: account for flash-resident kernel text under XIP
+
+Under XIP only [_sdata, _end) occupies RAM: reserve just that range in
+memblock, validate only the RAM-resident range against usable memory,
+and start the data resource at _sdata. Kernel text lives in flash and
+must not be reserved (or even representable) in RAM.
+---
+--- a/arch/mips/kernel/setup.c
++++ b/arch/mips/kernel/setup.c
+@@ -280,8 +280,17 @@
+ 	init_initrd();
+ 
+ 	/* Reserve memory occupied by kernel. */
+-	memblock_reserve(__pa_symbol(&_text),
+-			__pa_symbol(&_end) - __pa_symbol(&_text));
++	if (IS_ENABLED(CONFIG_XIP_KERNEL))
++		/*
++		 * .text/.rodata execute in place from flash, which is not
++		 * RAM; only the RAM-resident sections from _sdata on (see
++		 * vmlinux-xip.lds.S) occupy memory.
++		 */
++		memblock_reserve(__pa_symbol(&_sdata),
++				__pa_symbol(&_end) - __pa_symbol(&_sdata));
++	else
++		memblock_reserve(__pa_symbol(&_text),
++				__pa_symbol(&_end) - __pa_symbol(&_text));
+ 
+ 	/* max_low_pfn is not a number of pages but the end pfn of low mem */
+ 
+@@ -505,7 +514,9 @@
+ 
+ static void __init check_kernel_sections_mem(void)
+ {
+-	phys_addr_t start = __pa_symbol(&_text);
++	/* For XIP only the RAM-resident sections must be memory-backed. */
++	phys_addr_t start = IS_ENABLED(CONFIG_XIP_KERNEL) ?
++			__pa_symbol(&_sdata) : __pa_symbol(&_text);
+ 	phys_addr_t size = __pa_symbol(&_end) - start;
+ 
+ 	if (!memblock_is_region_memory(start, size)) {
+@@ -696,7 +707,9 @@
+ 
+ 	code_resource.start = __pa_symbol(&_text);
+ 	code_resource.end = __pa_symbol(&_etext) - 1;
+-	data_resource.start = __pa_symbol(&_etext);
++	/* For XIP, .text..rodata are in flash; RAM data starts at _sdata. */
++	data_resource.start = IS_ENABLED(CONFIG_XIP_KERNEL) ?
++			__pa_symbol(&_sdata) : __pa_symbol(&_etext);
+ 	data_resource.end = __pa_symbol(&_edata) - 1;
+ 	bss_resource.start = __pa_symbol(&__bss_start);
+ 	bss_resource.end = __pa_symbol(&__bss_stop) - 1;
