@@ -12,6 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup repositories
+        run: |
+          sudo add-apt-repository universe
+          sudo apt-get update
+
       - name: Install toolchain (clang + MIPS binutils + QEMU)
         run: |
           sudo apt-get update
