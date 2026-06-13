@@ -22,7 +22,7 @@ jobs:
           sudo apt-get update
           sudo apt install clang llvm lld  \
                  qemu-system-mips flex bison bc cpio xz-utils \
-                 libssl-dev libelf-dev
+                 libssl-dev libelf-dev gcc-mipsel-linux-gnu
 
       - name: Show toolchain & QEMU versions
         run: |
