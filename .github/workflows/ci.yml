@@ -18,7 +18,22 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             clang llvm lld binutils-mipsel-linux-gnu \
             qemu-system-mips flex bison bc cpio xz-utils \
-            libssl-dev libelf-dev
+            libssl-dev libelf-dev xxd
+
+      - name: Show toolchain & QEMU versions
+        run: |
+          echo "--- clang ---"
+          clang --version
+          echo "--- ld.lld ---"
+          ld.lld --version || true
+          echo "--- mipsel-linux-gnu-ld ---"
+          mipsel-linux-gnu-ld --version || true
+          echo "--- mipsel-linux-gnu-objcopy ---"
+          mipsel-linux-gnu-objcopy --version || true
+          echo "--- mipsel-linux-gnu-as ---"
+          mipsel-linux-gnu-as --version || true
+          echo "--- qemu-system-mipsel ---"
+          qemu-system-mipsel --version
 
       - name: Cache kernel tarball
         uses: actions/cache@v4
@@ -29,11 +44,39 @@ jobs:
       - name: Build kernel + flash image
         run: make
 
+      - name: Show build output info
+        if: always()
+        run: |
+          ls -la build/out/ || true
+          file build/out/xip-bios.bin || true
+          file build/linux-6.12.34/vmlinux || true
+
       - name: Verify XIP layout (readelf + System.map assertions)
         run: make verify
 
       - name: Boot smoke test in QEMU
         run: make test
+
+      - name: Show boot log
+        if: always()
+        run: |
+          echo "--- boot.log size ---"
+          ls -la build/out/boot.log || true
+          echo "--- boot.log (hex) ---"
+          xxd build/out/boot.log || true
+          echo "--- boot.log (text) ---"
+          cat build/out/boot.log || true
+
+      - name: QEMU debug trace on failure
+        if: failure()
+        run: |
+          qemu-system-mipsel -M malta -cpu 24Kf -m 256 \
+            -bios build/out/xip-bios.bin -display none \
+            -serial stdio -monitor none -no-reboot \
+            -d guest_errors,unimp,int,cpu_reset \
+            -D build/out/qemu-debug.log || true
+          echo "--- qemu-debug.log ---"
+          cat build/out/qemu-debug.log || true
 
       - name: Upload artifacts
         if: always()
@@ -43,4 +86,5 @@ jobs:
           path: |
             build/out/xip-bios.bin
             build/out/boot.log
+            build/out/qemu-debug.log
           if-no-files-found: ignore
