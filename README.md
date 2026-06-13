@@ -151,3 +151,4 @@ tests/       verify-layout.py, smoke-test.py
 
 The kernel patches and all code in this repository are **GPL-2.0**,
 the same license as the Linux kernel they modify.
+# mips-xip-kernel
