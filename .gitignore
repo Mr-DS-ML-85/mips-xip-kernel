@@ -4,3 +4,4 @@
 *.elf
 *.bin
 boot.log
+__pycache__
