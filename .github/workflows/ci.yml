@@ -20,7 +20,7 @@ jobs:
       - name: Install toolchain (clang + MIPS binutils + QEMU)
         run: |
           sudo apt-get update
-          sudo apt install clang llvm lld binutils-mipsel-linux-gnu \
+          sudo apt install clang llvm lld  \
                  qemu-system-mips flex bison bc cpio xz-utils \
                  libssl-dev libelf-dev
 
