@@ -1,0 +1,129 @@
+# LWRT-on-XIP kernel for QEMU malta (24Kf). Same execute-in-place core as
+# xip_qemu_malta_defconfig, with the subsystems LWRT's init + services need to
+# come up cleanly: procfs/sysfs/devtmpfs/tmpfs, sysctl, and IPv4 networking
+# with the QEMU malta NIC. The embedded LWRT initramfs is gzip-compressed.
+#
+# TWO QEMU-malta-only ceilings shape this config (neither exists on real
+# hardware):
+#
+#   1. R_MIPS_26 window. The kernel runs XIP from the -bios flash window at
+#      phys 0x1fc01000 -> KSEG0 0x9fc01000, leaving only ~4 MiB before the
+#      0xa0000000 segment boundary. MIPS jal cannot jump across it, so the
+#      flash-resident .text/.rodata/.init.text must stay under ~4 MiB.
+#   2. Byteswap window. QEMU only byte-swaps the first 0x3e0000 (~3.9 MiB) of a
+#      -bios image on mipsel, so the *entire* flash image (shim + kernel ROM +
+#      embedded initramfs) must fit under that.
+#
+# Together these mean the full firewall (nftables/conntrack/NAT) and the
+# bridge/802.1q datapath do NOT fit alongside the initramfs on malta. They are
+# deferred to the MT7628 defconfig: that SoC maps its SPI flash XIP window at
+# 0x1c000000 (KSEG0 0x9c000000) with 64 MiB of headroom and has no byteswap
+# quirk, so the complete feature set links and fits there. This malta config
+# exists to validate that LWRT *boots and runs* on an XIP kernel.
+# CONFIG_LOCALVERSION_AUTO is not set
+CONFIG_KERNEL_XZ=y
+# CONFIG_CROSS_MEMORY_ATTACH is not set
+CONFIG_BLK_DEV_INITRD=y
+CONFIG_INITRAMFS_SOURCE=""
+# Compress the embedded initramfs (the ~0.6 MB LWRT binary) to fit the malta
+# byteswap window.
+CONFIG_RD_GZIP=y
+CONFIG_INITRAMFS_COMPRESSION_GZIP=y
+# CONFIG_RD_BZIP2 is not set
+# CONFIG_RD_LZMA is not set
+# CONFIG_RD_XZ is not set
+# CONFIG_RD_LZO is not set
+# CONFIG_RD_LZ4 is not set
+# CONFIG_RD_ZSTD is not set
+# CONFIG_INITRAMFS_PRESERVE_MTIME is not set
+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+CONFIG_EXPERT=y
+# CONFIG_MULTIUSER is not set
+# CONFIG_SGETMASK_SYSCALL is not set
+# CONFIG_SYSFS_SYSCALL is not set
+# CONFIG_FHANDLE is not set
+CONFIG_POSIX_TIMERS=y
+# CONFIG_BUG is not set
+CONFIG_FUTEX=y
+CONFIG_EPOLL=y
+CONFIG_SIGNALFD=y
+CONFIG_TIMERFD=y
+CONFIG_EVENTFD=y
+CONFIG_SHMEM=y
+# CONFIG_AIO is not set
+# CONFIG_IO_URING is not set
+# CONFIG_ADVISE_SYSCALLS is not set
+# CONFIG_MEMBARRIER is not set
+# CONFIG_RSEQ is not set
+# CONFIG_CACHESTAT_SYSCALL is not set
+# CONFIG_KALLSYMS is not set
+CONFIG_MIPS_MALTA=y
+CONFIG_CPU_LITTLE_ENDIAN=y
+CONFIG_CPU_MIPS32_R2=y
+# CONFIG_MIPS_FP_SUPPORT is not set
+# CONFIG_MIPS_MT_SMP is not set
+CONFIG_XIP_KERNEL=y
+CONFIG_MIPS_CMDLINE_FROM_DTB=y
+# CONFIG_SUSPEND is not set
+# CONFIG_SECCOMP is not set
+# CONFIG_STACKPROTECTOR is not set
+# CONFIG_COMPAT_32BIT_TIME is not set
+# CONFIG_BLOCK is not set
+# CONFIG_BINFMT_SCRIPT is not set
+# CONFIG_COREDUMP is not set
+CONFIG_SLUB_TINY=y
+# CONFIG_COMPAT_BRK is not set
+# CONFIG_COMPACTION is not set
+# CONFIG_VM_EVENT_COUNTERS is not set
+CONFIG_SYSCTL=y
+CONFIG_PCI=y
+# CONFIG_STANDALONE is not set
+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
+# CONFIG_FW_LOADER is not set
+# CONFIG_ALLOW_DEV_COREDUMP is not set
+
+# --- Networking core (lean: just enough for dhcp client / dns / httpd) ---
+CONFIG_NET=y
+CONFIG_PACKET=y
+CONFIG_UNIX=y
+CONFIG_INET=y
+# CONFIG_IPV6 is not set
+# Bridge + 802.1q VLAN and the netfilter/nftables stack (the `fw` applet
+# target) are deferred to the MT7628 defconfig — they do not fit the malta
+# byteswap window alongside the initramfs (see header).
+
+# --- Network device drivers (QEMU malta NIC) ---
+CONFIG_NETDEVICES=y
+CONFIG_ETHERNET=y
+CONFIG_NET_VENDOR_AMD=y
+CONFIG_PCNET32=y
+
+CONFIG_SERIAL_8250=y
+CONFIG_SERIAL_8250_CONSOLE=y
+# CONFIG_HW_RANDOM is not set
+# CONFIG_DEVMEM is not set
+# CONFIG_DEVPORT is not set
+CONFIG_POWER_RESET=y
+CONFIG_POWER_RESET_PIIX4_POWEROFF=y
+CONFIG_POWER_RESET_SYSCON=y
+# CONFIG_HWMON is not set
+# CONFIG_USB_SUPPORT is not set
+# CONFIG_VIRTIO_MENU is not set
+# CONFIG_VHOST_MENU is not set
+# CONFIG_MIPS_PLATFORM_DEVICES is not set
+# CONFIG_IOMMU_SUPPORT is not set
+# CONFIG_FILE_LOCKING is not set
+# CONFIG_DNOTIFY is not set
+# CONFIG_INOTIFY_USER is not set
+CONFIG_PROC_FS=y
+CONFIG_PROC_SYSCTL=y
+CONFIG_SYSFS=y
+CONFIG_TMPFS=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+# CONFIG_MISC_FILESYSTEMS is not set
+# CONFIG_SYMBOLIC_ERRNAME is not set
+# CONFIG_DEBUG_MISC is not set
+# CONFIG_SECTION_MISMATCH_WARN_ONLY is not set
+# CONFIG_FTRACE is not set
+# CONFIG_RUNTIME_TESTING_MENU is not set

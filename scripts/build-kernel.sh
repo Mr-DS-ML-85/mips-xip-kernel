@@ -13,6 +13,7 @@ KVER=6.12.34
 CROSS="${CROSS:-mipsel-linux-gnu-}"
 CLANG="${CLANG:-clang}"
 JOBS="${JOBS:-$(nproc)}"
+DEFCONFIG="${DEFCONFIG:-xip_qemu_malta_defconfig}"
 
 case "$WORK" in *" "*) echo "error: workdir must not contain spaces (kbuild limitation)"; exit 1;; esac
 mkdir -p "$WORK"
@@ -38,10 +39,10 @@ fi
 echo "==> building initramfs userspace"
 "$TOP/scripts/build-userspace.sh" "$WORK/out"
 
-echo "==> configuring (xip_qemu_malta_defconfig)"
-cp "$TOP/configs/xip_qemu_malta_defconfig" "$KDIR/arch/mips/configs/"
+echo "==> configuring ($DEFCONFIG)"
+cp "$TOP/configs/$DEFCONFIG" "$KDIR/arch/mips/configs/"
 make -C "$KDIR" ARCH=mips CC="$CLANG" CROSS_COMPILE="$CROSS" \
-	xip_qemu_malta_defconfig
+	"$DEFCONFIG"
 "$KDIR/scripts/config" --file "$KDIR/.config" \
 	--set-str INITRAMFS_SOURCE "$WORK/out/initramfs.list"
 make -C "$KDIR" ARCH=mips CC="$CLANG" CROSS_COMPILE="$CROSS" olddefconfig

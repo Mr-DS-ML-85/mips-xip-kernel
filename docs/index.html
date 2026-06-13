@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MIPS XIP Kernel — Embedded Systems & Firmware Documentation</title>
+  <meta name="description" content="Comprehensive guide to building firmware, IoT devices, router systems, and embedded Linux with Execute-In-Place kernel technology for MIPS architectures.">
+  <meta name="keywords" content="OpenWrt, firmware, embedded systems, IoT, router, MIPS, XIP, kernel, Linux, TP-Link, Archer C54, SPI-NOR flash">
+  <meta property="og:title" content="MIPS XIP Kernel — Embedded Systems & Firmware Documentation">
+  <meta property="og:description" content="Execute-In-Place Linux kernel for memory-constrained embedded devices.">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+</head>
+<body>
+  <!-- Sidebar Navigation -->
+  <nav id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <span class="logo-icon">⚡</span>
+        <span class="logo-text">MIPS XIP</span>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle navigation">☰</button>
+    </div>
+
+    <div class="sidebar-search">
+      <input type="text" id="searchInput" placeholder="Search docs..." aria-label="Search documentation">
+    </div>
+
+    <div class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-section-title">Getting Started</div>
+        <a href="#overview" class="nav-link active" data-section="overview">Project Overview</a>
+        <a href="#quickstart" class="nav-link" data-section="quickstart">Quick Start Guide</a>
+        <a href="#architecture" class="nav-link" data-section="architecture">System Architecture</a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">Firmware Building</div>
+        <a href="#firmware-overview" class="nav-link" data-section="firmware-overview">Firmware Fundamentals</a>
+        <a href="#build-system" class="nav-link" data-section="build-system">Build System</a>
+        <a href="#kernel-config" class="nav-link" data-section="kernel-config">Kernel Configuration</a>
+        <a href="#image-assembly" class="nav-link" data-section="image-assembly">Image Assembly</a>
+        <a href="#boot-shim" class="nav-link" data-section="boot-shim">Boot Shim</a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">Embedded Systems</div>
+        <a href="#embedded-fundamentals" class="nav-link" data-section="embedded-fundamentals">Fundamentals</a>
+        <a href="#memory-mgmt" class="nav-link" data-section="memory-mgmt">Memory Management</a>
+        <a href="#cross-compilation" class="nav-link" data-section="cross-compilation">Cross-Compilation</a>
+        <a href="#toolchain" class="nav-link" data-section="toolchain">Toolchain Setup</a>
+        <a href="#freestanding" class="nav-link" data-section="freestanding">Freestanding Programs</a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">XIP Technology</div>
+        <a href="#xip-concept" class="nav-link" data-section="xip-concept">Execute-In-Place</a>
+        <a href="#xip-patches" class="nav-link" data-section="xip-patches">Kernel Patches</a>
+        <a href="#xip-linker" class="nav-link" data-section="xip-linker">Linker Script</a>
+        <a href="#xip-tlb" class="nav-link" data-section="xip-tlb">TLB Handlers</a>
+        <a href="#xip-memory-layout" class="nav-link" data-section="xip-memory-layout">Memory Layout</a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">IoT & Networking</div>
+        <a href="#iot-overview" class="nav-link" data-section="iot-overview">IoT Overview</a>
+        <a href="#iot-protocols" class="nav-link" data-section="iot-protocols">Protocols</a>
+        <a href="#router-firmware" class="nav-link" data-section="router-firmware">Router Firmware</a>
+        <a href="#network-stack" class="nav-link" data-section="network-stack">Network Stack</a>
+        <a href="#firewall" class="nav-link" data-section="firewall">Firewall & NAT</a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">Target Hardware</div>
+        <a href="#tp-link-archer" class="nav-link" data-section="tp-link-archer">TP-Link Archer C54</a>
+        <a href="#qemu" class="nav-link" data-section="qemu">QEMU Testing</a>
+        <a href="#real-hardware" class="nav-link" data-section="real-hardware">Real Hardware</a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">Testing & CI</div>
+        <a href="#testing" class="nav-link" data-section="testing">Test Infrastructure</a>
+        <a href="#ci-cd" class="nav-link" data-section="ci-cd">CI/CD Pipeline</a>
+        <a href="#verification" class="nav-link" data-section="verification">Verification</a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">Reference</div>
+        <a href="#file-reference" class="nav-link" data-section="file-reference">File Reference</a>
+        <a href="#glossary" class="nav-link" data-section="glossary">Glossary</a>
+        <a href="#faq" class="nav-link" data-section="faq">FAQ</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Header -->
+  <header class="mobile-header" id="mobileHeader">
+    <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open menu">☰</button>
+    <span class="mobile-title">MIPS XIP Docs</span>
+  </header>
+
+  <!-- Main Content -->
+  <main id="content" class="content">
+    <!-- Hero Section -->
+    <section id="hero" class="hero">
+      <div class="hero-content">
+        <div class="hero-badge">Linux 6.12.34 · MIPS32r2 · GPL-2.0</div>
+        <h1>MIPS XIP Kernel</h1>
+        <p class="hero-subtitle">Execute-In-Place Linux kernel for memory-constrained embedded devices. Build firmware, IoT nodes, and router systems that run directly from SPI-NOR flash — no RAM copy required.</p>
+        <div class="hero-stats">
+          <div class="stat">
+            <span class="stat-value">2304 KiB</span>
+            <span class="stat-label">RAM Saved</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">5</span>
+            <span class="stat-label">Kernel Patches</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">4 KiB</span>
+            <span class="stat-label">Boot Shim</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">&lt;1 KiB</span>
+            <span class="stat-label">PID 1 Binary</span>
+          </div>
+        </div>
+        <div class="hero-actions">
+          <a href="#quickstart" class="btn btn-primary">Quick Start →</a>
+          <a href="https://github.com" class="btn btn-secondary" target="_blank" rel="noopener">View on GitHub</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: Project Overview -->
+    <section id="overview" class="doc-section">
+      <h2>Project Overview</h2>
+      <p>This project implements <code>CONFIG_XIP_KERNEL</code> for the <strong>MIPS architecture</strong> on Linux 6.12.34. It enables the kernel to execute its <code>.text</code>, <code>.rodata</code>, and <code>.init.text</code> sections <strong>directly from SPI-NOR flash</strong> without copying to RAM or decompressing.</p>
+
+      <div class="callout callout-info">
+        <strong>Why XIP Matters:</strong> On routers with 8–16 MiB of total RAM, a stock compressed kernel consumes ~2.3 MiB just for the decompressed copy. XIP eliminates this overhead entirely.
+      </div>
+
+      <h3>Key Capabilities</h3>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">💾</div>
+          <h4>Flash Execution</h4>
+          <p>Kernel code runs directly from SPI-NOR flash at physical address <code>0x9FC01000</code>. No decompression, no RAM copy.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🧠</div>
+          <h4>RAM Optimization</h4>
+          <p>Frees ~2304 KiB of宝贵 RAM on memory-constrained devices. Critical for IoT nodes and budget routers.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔧</div>
+          <h4>Minimal Patches</h4>
+          <p>Only 5 kernel patches required. Uses MIPS KSEG0/KSEG1 direct-mapped segments — no page-table fixups needed.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🧪</div>
+          <h4>Verified Boot</h4>
+          <p>Static layout assertions + QEMU smoke tests ensure correctness. CI runs on every push.</p>
+        </div>
+      </div>
+
+      <h3>Supported Configurations</h3>
+      <table>
+        <thead>
+          <tr><th>Defconfig</th><th>Purpose</th><th>Networking</th><th>Use Case</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>xip_qemu_malta_defconfig</code></td><td>Minimal XIP test</td><td>No</td><td>Development & verification</td></tr>
+          <tr><td><code>lwrt_qemu_malta_defconfig</code></td><td>Router userspace</td><td>Full IPv4 + nftables</td><td>LWRT router firmware</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Section: Quick Start -->
+    <section id="quickstart" class="doc-section">
+      <h2>Quick Start Guide</h2>
+      <p>Build a bootable XIP kernel image in under 5 minutes.</p>
+
+      <h3>Prerequisites</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" data-target="prereq-code">Copy</button>
+        </div>
+        <pre id="prereq-code"><code># Ubuntu/Debian
+sudo apt update
+sudo apt install -y clang lld llvm binutils-mipsel-linux-gnu \
+  qemu-system-mips flex bison bc libelf-dev libssl-dev \
+  python3 python3-pip texinfo
+
+# Verify toolchain
+clang --version
+mipsel-linux-gnu-ld --version
+qemu-system-mips --version</code></pre>
+      </div>
+
+      <h3>Build Everything</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" data-target="build-code">Copy</button>
+        </div>
+        <pre id="build-code"><code># Clone the repository
+git clone https://github.com/user/mips-xip-kernel.git
+cd mips-xip-kernel
+
+# Full build: download + patch + compile + assemble
+make
+
+# Static layout verification
+make verify
+
+# Boot test in QEMU
+make test
+
+# Interactive QEMU session
+make run</code></pre>
+      </div>
+
+      <h3>Build Outputs</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">text</span>
+        </div>
+        <pre><code>build/
+├── linux-6.12.34/          # Patched kernel source tree
+│   ├── vmlinux             # ELF kernel image
+│   └── System.map          # Symbol map
+├── out/
+│   ├── xip-bios.bin        # Final flash image (shim + kernel ROM)
+│   ├── shim.elf            # Boot shim ELF
+│   ├── shim.bin            # Boot shim raw binary
+│   └── kernel.bin          # Kernel ROM blob (objcopy -O binary)
+└── boot.log                # QEMU serial output (if make test/run)</code></pre>
+      </div>
+    </section>
+
+    <!-- Section: Architecture -->
+    <section id="architecture" class="doc-section">
+      <h2>System Architecture</h2>
+
+      <div class="architecture-diagram">
+        <div class="arch-layer">
+          <div class="arch-label">Application Layer</div>
+          <div class="arch-boxes">
+            <div class="arch-box">Freestanding PID 1</div>
+            <div class="arch-box">LWRT Router Userspace</div>
+            <div class="arch-box">IoT Application</div>
+          </div>
+        </div>
+        <div class="arch-arrow">↓ syscalls (raw MIPS o32)</div>
+        <div class="arch-layer">
+          <div class="arch-label">Kernel Layer</div>
+          <div class="arch-boxes">
+            <div class="arch-box highlight">XIP Kernel (ROM)</div>
+            <div class="arch-box">RAM Data</div>
+            <div class="arch-box">TLB Handlers (RAM)</div>
+          </div>
+        </div>
+        <div class="arch-arrow">↓ execute from flash</div>
+        <div class="arch-layer">
+          <div class="arch-label">Hardware Layer</div>
+          <div class="arch-boxes">
+            <div class="arch-box">SPI-NOR Flash</div>
+            <div class="arch-box">RAM (8–16 MiB)</div>
+            <div class="arch-box">MIPS32r2 CPU</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Boot Sequence</h3>
+      <ol class="numbered-list">
+        <li><strong>CPU Reset:</strong> Jumps to reset vector at <code>0xBFC00000</code> (virtual) / <code>0x1FC00000</code> (physical)</li>
+        <li><strong>Boot Shim (4 KiB):</strong> Initializes GT-64120 system controller, fakes YAMON protocol, jumps to <code>kernel_entry</code></li>
+        <li><strong>head.S XIP Data Copy:</strong> Copies writable data from flash LMA to RAM VMA (<code>__data_loc → _sdata</code>)</li>
+        <li><strong>BSS Clear:</strong> Zeros the <code>.bss</code> section in RAM</li>
+        <li><strong>setup.c:</strong> Memblock accounting reserves only RAM-resident sections (<code>[_sdata, _end)</code>)</li>
+        <li><strong>Kernel Init:</strong> Standard Linux initialization with XIP-aware memory layout</li>
+        <li><strong>PID 1:</strong> Freestanding init binary executes, outputs markers, powers off</li>
+      </ol>
+    </section>
+
+    <!-- Section: Firmware Fundamentals -->
+    <section id="firmware-overview" class="doc-section">
+      <h2>Firmware Fundamentals</h2>
+      <p>Firmware is the software that bridges hardware and operating systems. In embedded Linux systems, firmware typically consists of a bootloader, kernel, device tree, and root filesystem — all packed into a flash image.</p>
+
+      <h3>Firmware Image Components</h3>
+      <div class="component-diagram">
+        <div class="component" style="background: var(--accent-red);">
+          <strong>Boot Shim</strong><br>4 KiB — Hardware init + jump to kernel
+        </div>
+        <div class="component" style="background: var(--accent-blue);">
+          <strong>Kernel (ROM)</strong><br>XIP — .text + .rodata in flash
+        </div>
+        <div class="component" style="background: var(--accent-green);">
+          <strong>Kernel (RAM)</strong><br>.data + .bss copied at boot
+        </div>
+        <div class="component" style="background: var(--accent-purple);">
+          <strong>Initramfs</strong><br>Root filesystem in RAM
+        </div>
+      </div>
+
+      <h3>Flash Memory Types</h3>
+      <table>
+        <thead>
+          <tr><th>Flash Type</th><th>Typical Size</th><th>Speed</th><th>XIP Support</th><th>Common Devices</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>SPI-NOR</td><td>4–16 MiB</td><td>~50 MB/s</td><td>Yes (this project)</td><td>Routers, IoT nodes</td></tr>
+          <tr><td>SPI-NAND</td><td>128 MiB–2 GiB</td><td>~200 MB/s</td><td>Limited</td><td>Set-top boxes, NAS</td></tr>
+          <tr><td>eMMC</td><td>4–64 GiB</td><td>~400 MB/s</td><td>No</td><td>Phones, tablets</td></tr>
+          <tr><td>NOR (parallel)</td><td>1–32 MiB</td><td>~100 MB/s</td><td>Yes</td><td>Legacy embedded</td></tr>
+        </tbody>
+      </table>
+
+      <h3>OpenWrt Firmware Image Structure</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">text</span>
+        </div>
+        <pre><code>┌─────────────────────────────────────────────────┐
+│  U-Boot Header (64 bytes)                       │
+├─────────────────────────────────────────────────┤
+│  Kernel (compressed or XIP)                     │
+│  ├── Entry point                                │
+│  ├── Device Tree Blob (DTB)                     │
+│  └── Initramfs                                  │
+├─────────────────────────────────────────────────┤
+│  Root Filesystem (SquashFS + JFFS2 overlay)     │
+├─────────────────────────────────────────────────┤
+│  Bootloader (U-Boot / Breed)                    │
+└─────────────────────────────────────────────────┘</code></pre>
+      </div>
+    </section>
+
+    <!-- Section: Build System -->
+    <section id="build-system" class="doc-section">
+      <h2>Build System</h2>
+      <p>The build system is a Makefile-driven pipeline that orchestrates kernel download, patching, compilation, and flash image assembly.</p>
+
+      <h3>Makefile Targets</h3>
+      <table>
+        <thead>
+          <tr><th>Target</th><th>Command</th><th>Description</th><th>Time</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>make</code></td><td><code>all: image</code></td><td>Full build pipeline</td><td>~5 min</td></tr>
+          <tr><td><code>make kernel</code></td><td><code>build-kernel.sh</code></td><td>Download, patch, compile kernel</td><td>~3 min</td></tr>
+          <tr><td><code>make image</code></td><td><code>build-image.sh</code></td><td>Assemble flash image</td><td>~10 sec</td></tr>
+          <tr><td><code>make verify</code></td><td><code>verify-layout.py</code></td><td>Static ELF assertions</td><td>~1 sec</td></tr>
+          <tr><td><code>make test</code></td><td><code>smoke-test.py</code></td><td>QEMU boot test</td><td>~30 sec</td></tr>
+          <tr><td><code>make run</code></td><td><code>run-qemu.sh</code></td><td>Interactive QEMU session</td><td>manual</td></tr>
+          <tr><td><code>make clean</code></td><td><code>rm -rf $(OUT)</code></td><td>Remove build outputs</td><td>instant</td></tr>
+          <tr><td><code>make distclean</code></td><td><code>rm -rf $(WORK)</code></td><td>Remove entire work directory</td><td>instant</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Build Pipeline Flow</h3>
+      <div class="pipeline">
+        <div class="pipeline-step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <strong>Fetch</strong>
+            <p>Download <code>linux-6.12.34.tar.xz</code> from kernel.org</p>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <strong>Extract</strong>
+            <p>Untar to <code>build/linux-6.12.34/</code></p>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <strong>Patch</strong>
+            <p>Apply 5 XIP patches via <code>patch -p1</code></p>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <strong>Userspace</strong>
+            <p>Build initramfs (LWRT rootfs or demo init)</p>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step">
+          <div class="step-number">5</div>
+          <div class="step-content">
+            <strong>Configure</strong>
+            <p>Copy defconfig, run <code>olddefconfig</code></p>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step">
+          <div class="step-number">6</div>
+          <div class="step-content">
+            <strong>Compile</strong>
+            <p>Build <code>vmlinux</code> with clang + mipsel binutils</p>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step">
+          <div class="step-number">7</div>
+          <div class="step-content">
+            <strong>Assemble</strong>
+            <p>Concatenate shim + kernel ROM → <code>xip-bios.bin</code></p>
+          </div>
+        </div>
+      </div>
+
+      <h3>build-kernel.sh Details</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" data-target="build-kernel-code">Copy</button>
+        </div>
+        <pre id="build-kernel-code"><code>#!/bin/bash
+set -euo pipefail
+
+KVER=6.12.34
+WORK=build
+KDIR=$WORK/linux-$KVER
+OUT=$WORK/out
+
+# Which defconfig to build. Defaults to the bare XIP boot-test config; the
+# LWRT image build overrides it with DEFCONFIG=lwrt_qemu_malta_defconfig.
+DEFCONFIG="${DEFCONFIG:-xip_qemu_malta_defconfig}"
+
+# 1. Fetch kernel tarball
+curl -fSL "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KVER}.tar.xz" \
+  -o "$WORK/linux-${KVER}.tar.xz"
+
+# 2. Extract
+tar -xf "$WORK/linux-${KVER}.tar.xz" -C "$WORK"
+
+# 3. Apply XIP patches
+for p in patches/*.patch; do
+  patch -p1 -d "$KDIR" &lt; "$p"
+done
+
+# 4. Build the initramfs userspace. With no arguments this builds the tiny
+#    freestanding demo PID 1; if LWRT_ROOTFS points at a staged rootfs, the
+#    script instead emits a gen_init_cpio list describing it (this is how the
+#    LWRT binary is baked in). Either way it writes $OUT/initramfs.list.
+bash scripts/build-userspace.sh "$OUT"
+
+# 5. Configure kernel from the selected defconfig, then point the embedded
+#    initramfs at the generated list.
+cp "configs/$DEFCONFIG" "$KDIR/arch/mips/configs/"
+make -C "$KDIR" CC=clang ARCH=mips CROSS_COMPILE=mipsel-linux-gnu- "$DEFCONFIG"
+"$KDIR/scripts/config" --file "$KDIR/.config" \
+  --set-str INITRAMFS_SOURCE "$OUT/initramfs.list"
+make -C "$KDIR" CC=clang ARCH=mips olddefconfig
+
+# 6. Compile
+make -C "$KDIR" CC=clang ARCH=mips \
+  CROSS_COMPILE=mipsel-linux-gnu- \
+  -j$(nproc) vmlinux</code></pre>
+      </div>
+    </section>
+
+    <!-- Section: Kernel Configuration -->
+    <section id="kernel-config" class="doc-section">
+      <h2>Kernel Configuration</h2>
+      <p>The kernel configuration is carefully tuned for minimal footprint while retaining essential embedded functionality.</p>
+
+      <h3>Minimal XIP Config</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">kconfig</span>
+          <button class="copy-btn" data-target="min-config">Copy</button>
+        </div>
+        <pre id="min-config"><code># Architecture
+CONFIG_MIPS=y
+CONFIG_32BIT=y
+CONFIG_CPU_MIPS32_R2=y
+CONFIG_CPU_LITTLE_ENDIAN=y
+
+# XIP (the core feature)
+CONFIG_XIP_KERNEL=y
+CONFIG_XIP_PHYS_ADDR=0x1fc01000
+
+# Optimization
+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+CONFIG_EXPERT=y
+CONFIG_SLUB_TINY=y
+CONFIG_KALLSYMS=n
+
+# Boot
+CONFIG_BLK_DEV_INITRD=y
+CONFIG_INITRAMFS_SOURCE=""
+
+# Hardware
+CONFIG_MIPS_MALTA=y
+CONFIG_PCI=y
+CONFIG_SERIAL_8250=y
+CONFIG_SERIAL_8250_CONSOLE=y
+
+# Power management
+CONFIG_POWER_RESET_PIIX4_POWEROFF=y
+
+# Disabled subsystems
+CONFIG_SMP=n
+CONFIG_FPU=n
+CONFIG_BLOCK=n
+CONFIG_PROC_FS=n
+CONFIG_SYSFS=n
+CONFIG_NET=n
+CONFIG_USB=n
+CONFIG_DEBUG_INFO=n</code></pre>
+      </div>
+
+      <h3>LWRT Router Config</h3>
+      <p>Extends the minimal config with just enough for the LWRT userspace to come up as PID 1: the virtual filesystems, sysctl, IPv4 networking and the QEMU malta NIC. The embedded LWRT initramfs is gzip-compressed.</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">kconfig</span>
+          <button class="copy-btn" data-target="lwrt-config">Copy</button>
+        </div>
+        <pre id="lwrt-config"><code># Networking core (lean: dhcp client / dns / httpd)
+CONFIG_NET=y
+CONFIG_PACKET=y
+CONFIG_UNIX=y
+CONFIG_INET=y
+# CONFIG_IPV6 is not set
+
+# Network driver (QEMU malta NIC)
+CONFIG_NETDEVICES=y
+CONFIG_ETHERNET=y
+CONFIG_NET_VENDOR_AMD=y
+CONFIG_PCNET32=y
+
+# VFS the LWRT init needs
+CONFIG_PROC_FS=y
+CONFIG_PROC_SYSCTL=y
+CONFIG_SYSFS=y
+CONFIG_TMPFS=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+
+# IPC / syscalls the Rust std runtime expects
+CONFIG_FUTEX=y
+CONFIG_EPOLL=y
+CONFIG_SIGNALFD=y
+CONFIG_TIMERFD=y
+CONFIG_EVENTFD=y
+CONFIG_SHMEM=y
+CONFIG_SYSCTL=y
+
+# Compress the embedded initramfs to fit the malta byteswap window
+CONFIG_RD_GZIP=y
+CONFIG_INITRAMFS_COMPRESSION_GZIP=y</code></pre>
+      </div>
+
+      <div class="callout callout-warning">
+        <strong>Why no netfilter/bridge on malta?</strong>
+        <p>The full firewall (nftables / conntrack / NAT) and the bridge/802.1q
+        datapath are deliberately <em>absent</em> from this config. Two
+        QEMU-malta-only ceilings — neither of which exists on real hardware —
+        make them impossible to fit here:</p>
+        <ol>
+          <li><strong>R_MIPS_26 window.</strong> XIP runs from the malta
+          <code>-bios</code> window at phys <code>0x1fc01000</code> →
+          KSEG0 <code>0x9fc01000</code>, leaving only ~4&nbsp;MiB before the
+          <code>0xa0000000</code> segment boundary. MIPS <code>jal</code> cannot
+          jump across it, so the flash-resident text must stay under ~4&nbsp;MiB.</li>
+          <li><strong>Byteswap window.</strong> QEMU only byte-swaps the first
+          <code>0x3e0000</code> (~3.9&nbsp;MiB) of a <code>-bios</code> image on
+          mipsel, so the <em>entire</em> flash image (shim + kernel ROM +
+          embedded initramfs) must fit under that.</li>
+        </ol>
+        <p>The complete feature set is deferred to the MT7628 defconfig: that
+        SoC maps its SPI flash XIP window at <code>0x1c000000</code>
+        (KSEG0 <code>0x9c000000</code>) with 64&nbsp;MiB of headroom and has no
+        byteswap quirk, so the full firewall links and fits there. The malta
+        config exists to validate that LWRT <em>boots and runs</em> on an XIP
+        kernel.</p>
+      </div>
+    </section>
+
+    <!-- Section: Image Assembly -->
+    <section id="image-assembly" class="doc-section">
+      <h2>Image Assembly</h2>
+      <p>The final flash image is assembled by concatenating the boot shim and the kernel ROM blob.</p>
+
+      <h3>Image Layout</h3>
+      <div class="memory-layout">
+        <div class="mem-region" style="background: #ff6b6b;">
+          <div class="mem-label">Boot Shim</div>
+          <div class="mem-size">4 KiB</div>
+          <div class="mem-addr">0x1FC00000</div>
+        </div>
+        <div class="mem-region" style="background: #4ecdc4; flex: 3;">
+          <div class="mem-label">Kernel ROM (.text + .rodata + .init.text)</div>
+          <div class="mem-size">~900 KiB</div>
+          <div class="mem-addr">0x1FC01000</div>
+        </div>
+        <div class="mem-region" style="background: #45b7d1; flex: 1;">
+          <div class="mem-label">Data (LMA in flash)</div>
+          <div class="mem-size">~200 KiB</div>
+          <div class="mem-addr">after .init</div>
+        </div>
+      </div>
+
+      <h3>Assembly Script</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" data-target="image-asm">Copy</button>
+        </div>
+        <pre id="image-asm"><code>#!/bin/bash
+set -euo pipefail
+
+WORK=build
+KDIR=$WORK/linux-6.12.34
+OUT=$WORK/out
+mkdir -p "$OUT"
+
+# 1. Extract kernel_entry address from System.map
+ENTRY=$(awk '$3 == "kernel_entry" {print "0x"$1}' "$KDIR/System.map")
+
+# 2. Build boot shim (4 KiB at reset vector)
+mipsel-linux-gnu-gcc -c -o shim.o shim/shim.S \
+  -mips32r2 -EL -mno-abicalls -fno-pic -nostdlib
+mipsel-linux-gnu-ld -o shim.elf shim.o \
+  -T shim/shim.ld --defsym kernel_entry="$ENTRY" \
+  -nostdlib --no-dynamic-linker
+mipsel-linux-gnu-objcopy -O binary shim.elf shim.bin
+
+# 3. Extract kernel ROM blob
+mipsel-linux-gnu-objcopy -O binary -j .text -j .rodata \
+  -j .init.text -j .data -j .init.data \
+  "$KDIR/vmlinux" kernel.bin
+
+# 4. Concatenate: shim + kernel → flash image
+cat shim.bin kernel.bin > xip-flash.bin
+
+# 5. Word-swap for QEMU malta (big-endian BIOS on mipsel)
+python3 -c "
+import sys
+data = open('xip-flash.bin','rb').read()
+swapped = b''
+for i in range(0, len(data), 4):
+    word = data[i:i+4]
+    if len(word) == 4:
+        swapped += bytes([word[3],word[2],word[1],word[0]])
+    else:
+        swapped += word
+open('$OUT/xip-bios.bin','wb').write(swapped)
+"
+
+echo "Flash image: $OUT/xip-bios.bin ($(stat -c%s $OUT/xip-bios.bin) bytes)"</code></pre>
+      </div>
+    </section>
+
+    <!-- Section: Boot Shim -->
+    <section id="boot-shim" class="doc-section">
+      <h2>Boot Shim</h2>
+      <p>The boot shim is a 4 KiB MIPS assembly program that initializes hardware and bridges the gap between the reset vector and the Linux kernel entry point.</p>
+
+      <h3>What the Shim Does</h3>
+      <ol class="numbered-list">
+        <li><strong>Skip QEMU board ID:</strong> Word at offset 0x10 contains a board identifier — skip over it</li>
+        <li><strong>Disable interrupts:</strong> <code>di</code> instruction prevents any interrupt during init</li>
+        <li><strong>GT-64120 init:</strong> Programs the system controller registers exactly as YAMON does:
+          <ul>
+            <li>Moves GT registers to <code>0x1BE00000</code></li>
+            <li>Sets PCI I/O decode at <code>0x18000000</code> (needed for serial at <code>0x180003F8</code>)</li>
+            <li>Configures PCI memory windows</li>
+          </ul>
+        </li>
+        <li><strong>Fake YAMON protocol:</strong> Sets registers <code>a0=argc, a1=argv, a2=envp, a3=memsize</code></li>
+        <li><strong>Jump to kernel:</strong> Loads <code>kernel_entry</code> address (injected via linker <code>--defsym</code>) and jumps</li>
+      </ol>
+
+      <div class="callout callout-warning">
+        <strong>Size Constraint:</strong> The shim must fit in exactly 4 KiB. The linker script enforces this with an assertion: <code>ASSERT(SIZEOF(.text) &lt;= 4096, "Shim too large")</code>
+      </div>
+    </section>
+
+    <!-- Section: Embedded Fundamentals -->
+    <section id="embedded-fundamentals" class="doc-section">
+      <h2>Embedded Systems Fundamentals</h2>
+      <p>Embedded systems are specialized computing devices designed for specific tasks, often with strict constraints on power, memory, cost, and real-time performance.</p>
+
+      <h3>Embedded Linux Architecture</h3>
+      <table>
+        <thead>
+          <tr><th>Layer</th><th>Component</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Application</td><td>User programs</td><td>Domain-specific logic (routing, sensor reading, etc.)</td></tr>
+          <tr><td>Libraries</td><td>uClibc, musl</td><td>Minimal C library for embedded systems</td></tr>
+          <tr><td>Middleware</td><td>BusyBox, procd</td><td>Init system, shell, core utilities</td></tr>
+          <tr><td>Kernel</td><td>Linux</td><td>Process management, drivers, networking</td></tr>
+          <tr><td>Bootloader</td><td>U-Boot, Breed</td><td>Hardware init, kernel loading</td></tr>
+          <tr><td>Board Support</td><td>Device Tree, patches</td><td>Hardware-specific configuration</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Resource Constraints</h3>
+      <div class="constraint-grid">
+        <div class="constraint">
+          <h4>RAM</h4>
+          <div class="constraint-bar"><div class="constraint-fill" style="width: 15%;">8 MiB</div></div>
+          <p>Typical for budget routers. XIP saves 2.3 MiB — nearly 30% of total RAM.</p>
+        </div>
+        <div class="constraint">
+          <h4>Flash</h4>
+          <div class="constraint-bar"><div class="constraint-fill" style="width: 25%;">16 MiB</div></div>
+          <p>SPI-NOR flash stores kernel, rootfs, and configuration.</p>
+        </div>
+        <div class="constraint">
+          <h4>CPU</h4>
+          <div class="constraint-bar"><div class="constraint-fill" style="width: 40%;">MIPS32r2 @ 580MHz</div></div>
+          <p>No FPU, no SMP, single-core. Optimization is critical.</p>
+        </div>
+        <div class="constraint">
+          <h4>Power</h4>
+          <div class="constraint-bar"><div class="constraint-fill" style="width: 10%;">~5W</div></div>
+          <p>Wall-powered but thermal constraints in compact enclosures.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: Memory Management -->
+    <section id="memory-mgmt" class="doc-section">
+      <h2>Memory Management</h2>
+      <p>Memory management in XIP kernels requires careful attention to the distinction between flash-resident and RAM-resident sections.</p>
+
+      <h3>MIPS Memory Map</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">text</span>
+        </div>
+        <pre><code>MIPS Virtual Address Space (32-bit)
+┌────────────────────────────────────────────────┐ 0xFFFFFFFF
+│  KSEG3 (0xBFC00000) — Cached, mapped           │
+│  └── Reset vector: 0xBFC00000                  │
+├────────────────────────────────────────────────┤ 0xA0000000
+│  KSEG1 (0xA0000000) — Uncached, unmapped       │
+│  └── I/O registers, flash if > 512 MiB         │
+├────────────────────────────────────────────────┤ 0x80000000
+│  KSEG0 (0x80000000) — Cached, unmapped         │
+│  └── RAM: 0x80000000 – 0x8FFFFFFF              │
+│  └── XIP virt: 0x80000000 + phys_addr         │
+├────────────────────────────────────────────────┤ 0x00000000
+│  USEG (0x00000000) — User space (mapped)       │
+└────────────────────────────────────────────────┘</code></pre>
+      </div>
+
+      <h3>XIP Memory Sections</h3>
+      <table>
+        <thead>
+          <tr><th>Section</th><th>Location</th><th>Address</th><th>Writable</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>.text</code></td><td>Flash (ROM)</td><td><code>0x9FC01000</code></td><td>No</td><td>Kernel code — executes in place</td></tr>
+          <tr><td><code>.rodata</code></td><td>Flash (ROM)</td><td>after .text</td><td>No</td><td>Read-only data (strings, constants)</td></tr>
+          <tr><td><code>.init.text</code></td><td>Flash (ROM)</td><td>after .rodata</td><td>No</td><td>Init functions (freed after boot)</td></tr>
+          <tr><td><code>.data</code></td><td>RAM</td><td><code>0x8xxxxxxx</code></td><td>Yes</td><td>Global/static variables</td></tr>
+          <tr><td><code>.bss</code></td><td>RAM</td><td>after .data</td><td>Yes</td><td>Zero-initialized data</td></tr>
+          <tr><td><code>.init.data</code></td><td>RAM</td><td>after .data</td><td>Yes</td><td>Init-only data (freed after boot)</td></tr>
+          <tr><td><code>.data..xip_patchable_text</code></td><td>RAM</td><td>after .data</td><td>Yes</td><td>TLB handlers (uasm-generated)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Data Copy at Boot</h3>
+      <div class="callout callout-info">
+        <strong>head.S Copy Loop:</strong> Before BSS clearing, the kernel copies writable data from flash to RAM:<br>
+        <code>__data_loc (flash LMA) → _sdata (RAM VMA)</code> through <code>__init_end</code><br>
+        This mirrors what ARM and RISC-V XIP heads do.
+      </div>
+    </section>
+
+    <!-- Section: Cross-Compilation -->
+    <section id="cross-compilation" class="doc-section">
+      <h2>Cross-Compilation</h2>
+      <p>Cross-compilation builds software on one architecture (x86_64) targeting another (MIPS). This project uses <strong>clang</strong> as the compiler with <strong>mipsel-linux-gnu-</strong> binutils for linking.</p>
+
+      <h3>Toolchain Components</h3>
+      <table>
+        <thead>
+          <tr><th>Tool</th><th>Purpose</th><th>Package</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>clang</code></td><td>C compiler (cross-compilation via --target)</td><td><code>clang</code></td></tr>
+          <tr><td><code>mipsel-linux-gnu-ld</code></td><td>Linker for MIPS little-endian</td><td><code>binutils-mipsel-linux-gnu</code></td></tr>
+          <tr><td><code>mipsel-linux-gnu-objcopy</code></td><td>Binary format conversion</td><td><code>binutils-mipsel-linux-gnu</code></td></tr>
+          <tr><td><code>mipsel-linux-gnu-gcc</code></td><td>Assembly (boot shim)</td><td><code>gcc-mipsel-linux-gnu</code></td></tr>
+          <tr><td><code>qemu-system-mips</code></td><td>Emulation for testing</td><td><code>qemu-system-mips</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Why Clang?</h3>
+      <ul class="styled-list">
+        <li><strong>No separate cross-compiler needed:</strong> Clang targets any architecture via <code>--target=mipsel-linux-gnu</code></li>
+        <li><strong>Better diagnostics:</strong> Clearer error messages for kernel code issues</li>
+        <li><strong>Faster compilation:</strong> Generally faster than GCC for kernel builds</li>
+        <li><strong>Reproducible builds:</strong> Deterministic output across machines</li>
+      </ul>
+    </section>
+
+    <!-- Section: Toolchain -->
+    <section id="toolchain" class="doc-section">
+      <h2>Toolchain Setup</h2>
+
+      <h3>Ubuntu/Debian</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" data-target="toolchain-ubuntu">Copy</button>
+        </div>
+        <pre id="toolchain-ubuntu"><code># Install cross-compilation toolchain
+sudo apt install -y \
+  clang lld llvm \
+  binutils-mipsel-linux-gnu \
+  gcc-mipsel-linux-gnu \
+  qemu-system-mips
+
+# Verify
+clang --version
+mipsel-linux-gnu-ld --version
+qemu-system-mips --version</code></pre>
+      </div>
+
+      <h3>Build Dependencies</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" data-target="build-deps">Copy</button>
+        </div>
+        <pre id="build-deps"><code># Kernel build dependencies
+sudo apt install -y \
+  flex bison bc libelf-dev libssl-dev \
+  libncurses-dev cpio wget xz-utils \
+  python3 python3-pip</code></pre>
+      </div>
+    </section>
+
+    <!-- Section: Freestanding Programs -->
+    <section id="freestanding" class="doc-section">
+      <h2>Freestanding Programs</h2>
+      <p>Freestanding programs run without any C library or OS support. This project includes a minimal PID 1 init binary that uses raw MIPS syscalls.</p>
+
+      <h3>userspace/init.c</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">c</span>
+          <button class="copy-btn" data-target="init-code">Copy</button>
+        </div>
+        <pre id="init-code"><code>// Freestanding PID 1 — no libc, raw MIPS o32 syscalls
+#include &lt;stddef.h&gt;
+
+#define SYS_exit    4001
+#define SYS_write   4004
+#define SYS_pause   4029
+#define SYS_sync    4036
+#define SYS_reboot  4088
+
+static void syscall1(int n, int a0) {
+    register int v0 __asm__("v0") = n;
+    register int a0r __asm__("a0") = a0;
+    __asm__ volatile("syscall" : "+r"(v0) : "r"(a0r) : "memory");
+}
+
+static void write_str(const char *s, int len) {
+    register int v0 __asm__("v0") = SYS_write;
+    register int fd __asm__("a0") = 1;  // stdout
+    register const char *buf __asm__("a1") = s;
+    register int sz __asm__("a2") = len;
+    __asm__ volatile("syscall" : "+r"(v0) : "r"(fd), "r"(buf), "r"(sz) : "memory");
+}
+
+void _start(void) {
+    write_str("XIP-USERSPACE-OK\n", 17);
+    write_str("XIP-POWEROFF: requesting power off\n", 35);
+    syscall1(SYS_sync, 0);
+    // reboot(LINUX_REBOOT_CMD_POWER_OFF = 0x4321fedc)
+    register int v0 __asm__("v0") = SYS_reboot;
+    register int a0 __asm__("a0") = 0xfee1dead;
+    register int a1 __asm__("a1") = 672274793;
+    register int a2 __asm__("a2") = 0x4321fedc;
+    __asm__ volatile("syscall" : "+r"(v0) : "r"(a0), "r"(a1), "r"(a2) : "memory");
+    while(1); // should never reach here
+}</code></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <strong>Why Freestanding?</strong> On a device with 8 MiB RAM, even musl libc adds overhead. Raw syscalls keep the init binary under 1 KiB.
+      </div>
+    </section>
+
+    <!-- Section: XIP Concept -->
+    <section id="xip-concept" class="doc-section">
+      <h2>Execute-In-Place (XIP)</h2>
+      <p>XIP allows code to execute directly from non-volatile storage (flash) without first copying it to RAM. This is fundamentally different from traditional boot where the kernel is decompressed into RAM before execution.</p>
+
+      <h3>Traditional vs XIP Boot</h3>
+      <div class="comparison">
+        <div class="comparison-side">
+          <h4>Traditional Boot</h4>
+          <div class="code-block">
+            <pre><code>1. Bootloader loads compressed kernel to RAM
+2. Kernel decompresses itself (~900 KiB → ~2.3 MiB)
+3. Decompressed kernel copied to final RAM location
+4. Kernel starts executing from RAM
+5. RAM used: ~2.3 MiB for kernel alone</code></pre>
+          </div>
+        </div>
+        <div class="comparison-side">
+          <h4>XIP Boot</h4>
+          <div class="code-block">
+            <pre><code>1. Boot shim initializes hardware
+2. Kernel executes directly from flash
+3. Only writable data copied to RAM (~200 KiB)
+4. TLB handlers allocated in RAM
+5. RAM used: ~200 KiB for data only</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <h3>RAM Savings Breakdown</h3>
+      <table>
+        <thead>
+          <tr><th>Component</th><th>Traditional</th><th>XIP</th><th>Savings</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Kernel text (decompressed)</td><td>~2304 KiB</td><td>0 KiB (in flash)</td><td>2304 KiB</td></tr>
+          <tr><td>Kernel data</td><td>~200 KiB</td><td>~200 KiB</td><td>0 KiB</td></tr>
+          <tr><td>TLB handlers</td><td>0 (in .text)</td><td>~4 KiB</td><td>-4 KiB</td></tr>
+          <tr><td>Trampolines</td><td>0</td><td>~0.5 KiB</td><td>-0.5 KiB</td></tr>
+          <tr><td><strong>Total</strong></td><td><strong>~2508 KiB</strong></td><td><strong>~204 KiB</strong></td><td><strong>~2304 KiB</strong></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Section: XIP Patches -->
+    <section id="xip-patches" class="doc-section">
+      <h2>Kernel Patches</h2>
+      <p>Five patches against Linux 6.12.34 enable XIP on MIPS. Each addresses a specific challenge.</p>
+
+      <div class="patch-list">
+        <div class="patch-card">
+          <div class="patch-header">
+            <span class="patch-number">Patch 1</span>
+            <span class="patch-file">arch/mips/Kconfig</span>
+          </div>
+          <h4>Kconfig Additions</h4>
+          <p>Adds <code>CONFIG_XIP_KERNEL</code> (bool) and <code>CONFIG_XIP_PHYS_ADDR</code> (hex) to MIPS architecture options. Dependencies: <code>32BIT && !RELOCATABLE && !MAPPED_KERNEL && !SMP</code>.</p>
+        </div>
+
+        <div class="patch-card">
+          <div class="patch-header">
+            <span class="patch-number">Patch 2</span>
+            <span class="patch-file">arch/mips/kernel/vmlinux-xip.lds.S</span>
+          </div>
+          <h4>XIP Linker Script (261 lines)</h4>
+          <p>The largest patch. Defines ROM region at <code>XIP_VIRT_ADDR</code> and RAM region at <code>LINKER_LOAD_ADDRESS</code>. Introduces <code>XIP_AT()</code> macro to override asm-generic address macros. Moves <code>.data..ro_after_init</code> to RAM.</p>
+        </div>
+
+        <div class="patch-card">
+          <div class="patch-header">
+            <span class="patch-number">Patch 3</span>
+            <span class="patch-file">arch/mips/kernel/head.S</span>
+          </div>
+          <h4>XIP Data Copy</h4>
+          <p>Adds a copy loop in <code>head.S</code> that copies writable data from flash LMA to RAM VMA before BSS clearing. Mirrors ARM and RISC-V XIP implementations.</p>
+        </div>
+
+        <div class="patch-card">
+          <div class="patch-header">
+            <span class="patch-number">Patch 4</span>
+            <span class="patch-file">arch/mips/kernel/setup.c</span>
+          </div>
+          <h4>Memblock Accounting</h4>
+          <p>Three changes: reserves only <code>[_sdata, _end)</code> under XIP, validates only RAM-resident sections, sets <code>data_resource.start = _sdata</code>.</p>
+        </div>
+
+        <div class="patch-card">
+          <div class="patch-header">
+            <span class="patch-number">Patch 5</span>
+            <span class="patch-file">arch/mips/mm/tlb-funcs.S, page-funcs.S, tlbex.c</span>
+          </div>
+          <h4>TLB Handlers + Uasm RAM Buffers</h4>
+          <p>The hardest part. MIPS TLB handlers are uasm-generated at boot into .text buffers — impossible under XIP. Solution: move patchable buffers to RAM section, add ROM trampolines with cross-segment register jumps.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: XIP Linker Script -->
+    <section id="xip-linker" class="doc-section">
+      <h2>XIP Linker Script</h2>
+      <p>The linker script is the most complex patch (261 lines). It splits the kernel into ROM and RAM regions.</p>
+
+      <h3>Key Directives</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">ld</span>
+          <button class="copy-btn" data-target="linker-code">Copy</button>
+        </div>
+        <pre id="linker-code"><code>/* XIP virtual address = KSEG0 + physical offset */
+XIP_VIRT_ADDR = 0x80000000 + CONFIG_XIP_PHYS_ADDR;
+
+/* ROM region — executes directly from flash */
+SECTIONS {
+    .text XIP_VIRT_ADDR : AT(CONFIG_XIP_PHYS_ADDR) {
+        _text = .;
+        /* ... code sections ... */
+        _etext = .;
+    }
+
+    /* RAM region — writable data */
+    .data LINKER_LOAD_ADDRESS : {
+        _sdata = .;
+        /* ... data sections ... */
+        _edata = .;
+    }
+
+    .bss : {
+        _sbss = .;
+        /* ... BSS sections ... */
+        _ebss = .;
+    }
+
+    /* Special section for uasm-generated TLB handlers */
+    .data..xip_patchable_text : {
+        /* RAM buffers that kernel writes at boot */
+    }
+}
+
+/* Custom macro to override asm-generic AT() */
+#define XIP_AT(addr) (addr) - LOAD_OFFSET + XIP_PHYS_OFFSET</code></pre>
+      </div>
+
+      <h3>XIP_AT() Macro Explained</h3>
+      <div class="callout callout-warning">
+        <strong>The Problem:</strong> asm-generic macros hardcode <code>AT(ADDR(x) - LOAD_OFFSET)</code>, which would reset RAM-section load addresses to incorrect flash offsets. The <code>XIP_AT()</code> macro overrides this to produce correct LMA values.
+      </div>
+    </section>
+
+    <!-- Section: TLB Handlers -->
+    <section id="xip-tlb" class="doc-section">
+      <h2>TLB Handlers</h2>
+      <p>The TLB (Translation Lookaside Buffer) handler patch is the most technically challenging part of the XIP implementation.</p>
+
+      <h3>The Problem</h3>
+      <p>MIPS TLB exception handlers (<code>handle_tlbl</code>, <code>handle_tlbs</code>, <code>handle_tlbm</code>) are generated at boot using <strong>uasm</strong> — a MIPS assembly DSL. The kernel writes machine code into buffers in <code>.text</code>. Under XIP, <code>.text</code> is ROM — writes are silently dropped.</p>
+
+      <h3>The Solution</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">asm</span>
+        </div>
+        <pre><code>/* ROM trampoline in .text (original symbol location) */
+handle_tlbl:
+    PTR_LA  t9, xip_handle_tlbmiss_handler_setup_pgd
+    jr      t9
+    nop
+
+/* RAM buffer in .data..xip_patchable_text */
+xip_handle_tlbmiss_handler_setup_pgd:
+    /* uasm-generated code lives here — writable RAM */</code></pre>
+      </div>
+
+      <h3>Cross-Segment Jump Problem</h3>
+      <p>The <code>jal</code>/<code>R_MIPS_26</code> instruction cannot cross the 256 MiB jump segment between flash (<code>0x9fcxxxxx</code>) and RAM (<code>0x80xxxxxx</code>). Solution: trampolines use <code>lui/addiu/jr</code> sequences for register-indirect jumps.</p>
+    </section>
+
+    <!-- Section: Memory Layout -->
+    <section id="xip-memory-layout" class="doc-section">
+      <h2>Memory Layout</h2>
+
+      <h3>Physical Memory Map</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">text</span>
+        </div>
+        <pre><code>Physical Address Space
+┌────────────────────────────────────────────┐ 0x20000000 (512 MiB)
+│  End of KSEG0/KSEG1 direct-mapped region   │
+├────────────────────────────────────────────┤
+│  ...                                       │
+├────────────────────────────────────────────┤ 0x1FC00000
+│  SPI-NOR Flash (16 MiB)                    │
+│  ├── 0x1FC00000: Boot Shim (4 KiB)         │
+│  ├── 0x1FC01000: Kernel .text (XIP)        │
+│  ├── 0x1FDxxxxx: Kernel .rodata (XIP)      │
+│  ├── 0x1FExxxxx: Kernel .init.text (XIP)   │
+│  └── 0x1FFxxxxx: Data LMA (copied to RAM)  │
+├────────────────────────────────────────────┤ 0x1E000000
+│  RAM (8–16 MiB)                            │
+│  ├── 0x80000000: Kernel .data              │
+│  ├── 0x800xxxxx: Kernel .bss               │
+│  ├── 0x801xxxxx: TLB handlers (RAM)        │
+│  ├── 0x802xxxxx: Free memory               │
+│  └── 0x81FFFFFF: End of 32 MiB window      │
+└────────────────────────────────────────────┘</code></pre>
+      </div>
+
+      <h3>Virtual Address Mapping</h3>
+      <table>
+        <thead>
+          <tr><th>Segment</th><th>Virtual Range</th><th>Physical</th><th>Cached</th><th>Use</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>KSEG0</td><td><code>0x80000000–0x9FFFFFFF</code></td><td><code>0x00000000–0x1FFFFFFF</code></td><td>Yes</td><td>RAM, XIP kernel</td></tr>
+          <tr><td>KSEG1</td><td><code>0xA0000000–0xBFFFFFFF</code></td><td><code>0x00000000–0x1FFFFFFF</code></td><td>No</td><td>I/O registers</td></tr>
+          <tr><td>KSEG2</td><td><code>0xC0000000–0xFFFFFFFF</code></td><td>mapped</td><td>Yes</td><td>VMalloc, kernel modules</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Section: IoT Overview -->
+    <section id="iot-overview" class="doc-section">
+      <h2>IoT Overview</h2>
+      <p>The Internet of Things (IoT) connects embedded devices to networks for data collection, monitoring, and control. This project's XIP technology is directly applicable to IoT devices running on flash-constrained hardware.</p>
+
+      <h3>IoT Device Categories</h3>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">📡</div>
+          <h4>Sensor Nodes</h4>
+          <p>Temperature, humidity, motion sensors. Ultra-low power, periodic wake-and-report. XIP saves RAM for sensor buffers.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🏠</div>
+          <h4>Smart Home</h4>
+          <p>Lighting, locks, thermostats. Local processing + cloud connectivity. XIP enables larger applications on same hardware.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🏭</div>
+          <h4>Industrial IoT</h4>
+          <p>PLC controllers, predictive maintenance. Deterministic timing requirements. XIP eliminates decompression latency.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🌐</div>
+          <h4>Edge Routers</h4>
+          <p>Gateway devices bridging IoT protocols to internet. This project targets exactly this category.</p>
+        </div>
+      </div>
+
+      <h3>IoT + XIP Benefits</h3>
+      <ul class="styled-list">
+        <li><strong>Faster boot:</strong> No decompression step — kernel starts executing immediately from flash</li>
+        <li><strong>More RAM for application:</strong> 2.3 MiB savings means more buffer space for sensor data or network packets</li>
+        <li><strong>Lower power:</strong> Fewer RAM accesses during boot reduce energy consumption</li>
+        <li><strong>Simpler OTA:</strong> Flash-only updates — no need to handle RAM decompression during firmware upgrades</li>
+      </ul>
+    </section>
+
+    <!-- Section: IoT Protocols -->
+    <section id="iot-protocols" class="doc-section">
+      <h2>IoT Protocols</h2>
+      <p>Common protocols used in IoT deployments, many of which can run on this XIP-enabled embedded Linux platform.</p>
+
+      <table>
+        <thead>
+          <tr><th>Protocol</th><th>Layer</th><th>Transport</th><th>Use Case</th><th>RAM Footprint</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>MQTT</td><td>Application</td><td>TCP</td><td>Pub/sub messaging</td><td>~10 KiB</td></tr>
+          <tr><td>CoAP</td><td>Application</td><td>UDP</td><td>REST for constrained devices</td><td>~5 KiB</td></tr>
+          <tr><td>HTTP/1.1</td><td>Application</td><td>TCP</td><td>Web APIs, OTA updates</td><td>~20 KiB</td></tr>
+          <tr><td>WebSocket</td><td>Application</td><td>TCP</td><td>Real-time bidirectional</td><td>~15 KiB</td></tr>
+          <tr><td>LwM2M</td><td>Application</td><td>CoAP</td><td>Device management</td><td>~25 KiB</td></tr>
+          <tr><td>DHCP</td><td>Network</td><td>UDP</td><td>IP address assignment</td><td>~8 KiB</td></tr>
+          <tr><td>mDNS</td><td>Network</td><td>UDP</td><td>Local service discovery</td><td>~12 KiB</td></tr>
+          <tr><td>802.15.4</td><td>Data Link</td><td>—</td><td>Low-power wireless (Zigbee/Thread)</td><td>~15 KiB</td></tr>
+          <tr><td>LoRaWAN</td><td>Network</td><td>—</td><td>Long-range, low-power</td><td>~30 KiB</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Section: Router Firmware -->
+    <section id="router-firmware" class="doc-section">
+      <h2>Router Firmware</h2>
+      <p>Building custom router firmware is one of the primary use cases for this XIP kernel project. The LWRT (Lightweight Router Toolkit) configuration demonstrates a full networking stack.</p>
+
+      <h3>Router Firmware Components</h3>
+      <div class="component-diagram">
+        <div class="component" style="background: var(--accent-blue);">
+          <strong>Kernel</strong><br>XIP + networking drivers + nftables
+        </div>
+        <div class="component" style="background: var(--accent-green);">
+          <strong>Network Stack</strong><br>IPv4/IPv6, bridge, VLAN, NAT
+        </div>
+        <div class="component" style="background: var(--accent-purple);">
+          <strong>Userspace</strong><br>procd, netifd, dnsmasq, hostapd
+        </div>
+        <div class="component" style="background: var(--accent-red);">
+          <strong>Web UI</strong><br>LuCI or custom admin interface
+        </div>
+      </div>
+
+      <h3>OpenWrt Build Process</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" data-target="openwrt-build">Copy</button>
+        </div>
+        <pre id="openwrt-build"><code># Standard OpenWrt build (for reference)
+git clone https://git.openwrt.org/openwrt/openwrt.git
+cd openwrt
+./scripts/feeds update -a
+./scripts/feeds install -a
+make menuconfig  # Select Target → MediaTek Ralink → MT76x8
+make -j$(nproc)  # Builds full firmware image
+
+# Output: bin/targets/ramips/mt76x8/openwrt-ramips-mt76x8-*.bin</code></pre>
+      </div>
+
+      <h3>Custom Firmware with XIP</h3>
+      <p>To build router firmware with XIP kernel:</p>
+      <ol class="numbered-list">
+        <li>Build the XIP kernel using this project's Makefile</li>
+        <li>Stage an LWRT root filesystem with <code>build-userspace.sh</code></li>
+        <li>Configure <code>LWRT_ROOTFS=/path/to/staged/rootfs</code></li>
+        <li>The build system generates a combined initramfs image</li>
+        <li>Flash the resulting <code>xip-bios.bin</code> to the router's SPI-NOR</li>
+      </ol>
+    </section>
+
+    <!-- Section: Network Stack -->
+    <section id="network-stack" class="doc-section">
+      <h2>Network Stack</h2>
+      <p>The LWRT defconfig enables a full IPv4 networking stack suitable for router firmware.</p>
+
+      <h3>Network Subsystems Enabled</h3>
+      <table>
+        <thead>
+          <tr><th>Subsystem</th><th>Config</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>IPv4</td><td><code>CONFIG_INET=y</code></td><td>Core Internet Protocol</td></tr>
+          <tr><td>Bridging</td><td><code>CONFIG_BRIDGE=y</code></td><td>LAN port bridging (switch functionality)</td></tr>
+          <tr><td>VLAN</td><td><code>CONFIG_VLAN_8021Q=y</code></td><td>Virtual LAN tagging</td></tr>
+          <tr><td>Multicast</td><td><code>CONFIG_IP_MULTICAST=y</code></td><td>Multicast routing support</td></tr>
+          <tr><td>Advanced routing</td><td><code>CONFIG_IP_ADVANCED_ROUTER=y</code></td><td>Policy routing, multiple tables</td></tr>
+          <tr><td>PCnet NIC</td><td><code>CONFIG_PCNET32=y</code></td><td>QEMU malta network driver</td></tr>
+          <tr><td>Conntrack</td><td><code>CONFIG_NF_CONNTRACK=y</code></td><td>Connection tracking for NAT</td></tr>
+          <tr><td>nftables</td><td><code>CONFIG_NF_TABLES=y</code></td><td>Modern packet filtering</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Section: Firewall -->
+    <section id="firewall" class="doc-section">
+      <h2>Firewall & NAT</h2>
+      <p>The nftables-based firewall provides stateful packet inspection and NAT for router deployments.</p>
+
+      <h3>Netfilter Components</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">kconfig</span>
+        </div>
+        <pre><code># Connection tracking
+CONFIG_NF_CONNTRACK=y
+
+# NAT
+CONFIG_NF_NAT=y
+CONFIG_NF_NAT_MASQUERADE=y
+
+# nftables framework
+CONFIG_NF_TABLES=y
+CONFIG_NFT_CT=y          # Connection tracking in nftables
+CONFIG_NFT_NAT=y         # NAT in nftables
+CONFIG_NFT_MASQ=y        # Masquerading in nftables</code></pre>
+      </div>
+
+      <h3>Typical Router Firewall Rules</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">nftables</span>
+          <button class="copy-btn" data-target="nft-rules">Copy</button>
+        </div>
+        <pre id="nft-rules"><code>#!/usr/sbin/nft -f
+flush ruleset
+
+table inet filter {
+    chain input {
+        type filter hook input priority 0; policy drop;
+        iif lo accept
+        ct state established,related accept
+        tcp dport 22 accept           # SSH
+        icmp type echo-request accept # Ping
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+        ct state established,related accept
+        iif "lan" oif "wan" accept    # LAN → WAN
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+}
+
+table inet nat {
+    chain prerouting {
+        type nat hook prerouting priority -100;
+    }
+
+    chain postrouting {
+        type nat hook postrouting priority 100;
+        oif "wan" masquerade          # NAT for LAN clients
+    }
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- Section: TP-Link Archer C54 -->
+    <section id="tp-link-archer" class="doc-section">
+      <h2>TP-Link Archer C54</h2>
+      <p>The primary target hardware for this project — a budget router with extremely constrained memory.</p>
+
+      <h3>Hardware Specifications</h3>
+      <table>
+        <thead>
+          <tr><th>Component</th><th>Specification</th><th>Impact</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>SoC</td><td>MediaTek MT7628KN</td><td>MIPS24KEc @ 575 MHz</td></tr>
+          <tr><td>RAM</td><td>8 MiB DDR1</td><td>XIP saves 28.8% of total RAM</td></tr>
+          <tr><td>Flash</td><td>16 MiB SPI-NOR (W25Q128)</td><td>Direct CPU addressing via KSEG1</td></tr>
+          <tr><td>Wi-Fi</td><td>2.4 GHz 802.11n (2×2)</td><td>Requires wireless driver in kernel</td></tr>
+          <tr><td>Ethernet</td><td>4× LAN + 1× WAN (100 Mbps)</td><td>MT7530 switch芯片</td></tr>
+          <tr><td>USB</td><td>None</td><td>No USB subsystem needed</td></tr>
+          <tr><td>Power</td><td>9V DC, ~0.6A</td><td>~5.4W consumption</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Flash Memory Map (16 MiB)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">text</span>
+        </div>
+        <pre><code>Offset    Size      Partition
+0x000000  128 KiB   Bootloader (U-Boot / Breed)
+0x020000  64 KiB    Config (factory defaults)
+0x030000  64 KiB    Config (user settings)
+0x040000  128 KiB   Bootloader (backup)
+0x060000  14.75 MiB Firmware (kernel + rootfs)
+  ├── 0x060000  4 KiB    Boot Shim (XIP)
+  ├── 0x061000  ~900 KiB Kernel .text (XIP)
+  ├── 0x101000  ~200 KiB Kernel data (copied to RAM)
+  └── 0x111000  ~14 MiB  Root filesystem (SquashFS)
+0xFE0000  128 KiB   Board config (MAC, region)
+0xFF0000  64 KiB    Boot countdown</code></pre>
+      </div>
+
+      <div class="callout callout-warning">
+        <strong>Flashing Warning:</strong> Always backup the original firmware before flashing. A bad flash can brick the device. Use serial console (UART at 115200 baud) for recovery.
+      </div>
+    </section>
+
+    <!-- Section: QEMU Testing -->
+    <section id="qemu" class="doc-section">
+      <h2>QEMU Testing</h2>
+      <p>QEMU provides a safe, reproducible testing environment that closely mirrors real hardware without risk of bricking devices.</p>
+
+      <h3>Why QEMU Malta?</h3>
+      <ul class="styled-list">
+        <li><strong>GT-64120 system controller:</strong> Same as real MIPS development boards</li>
+        <li><strong>Serial console:</strong> ttyS0 at <code>0x180003F8</code> (identical to real hardware)</li>
+        <li><strong>NOR flash simulation:</strong> <code>-bios</code> flag loads image at reset vector</li>
+        <li><strong>PIIX4 poweroff:</strong> Clean exit for automated testing</li>
+        <li><strong>No network required:</strong> Fully self-contained testing</li>
+      </ul>
+
+      <h3>QEMU Launch Command</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" data-target="qemu-cmd">Copy</button>
+        </div>
+        <pre id="qemu-cmd"><code>qemu-system-mipsel \
+  -M malta \
+  -m 256M \
+  -nographic \
+  -bios build/out/xip-bios.bin \
+  -serial mon:stdio \
+  -no-reboot \
+  -device pci-testdev 2>&amp;1 | tee build/boot.log</code></pre>
+      </div>
+
+      <h3>Expected Serial Output</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">text</span>
+        </div>
+        <pre><code>Linux version 6.12.34 (builder@x86) (clang 18.0) #1 SMP ...
+...
+Memory: 245760K/262144K available (1024K kernel code, ...)
+...
+Freeing unused kernel image(s): 32K freed
+XIP-USERSPACE-OK
+XIP-POWEROFF: requesting power off</code></pre>
+      </div>
+    </section>
+
+    <!-- Section: Real Hardware -->
+    <section id="real-hardware" class="doc-section">
+      <h2>Real Hardware</h2>
+      <p>Deploying to real hardware requires additional considerations beyond QEMU testing.</p>
+
+      <h3>Deployment Checklist</h3>
+      <div class="checklist">
+        <label class="check-item"><input type="checkbox"> Backup original firmware via serial/U-Boot</label>
+        <label class="check-item"><input type="checkbox"> Verify flash size matches expected (16 MiB)</label>
+        <label class="check-item"><input type="checkbox"> Confirm UART pins (TX/RX/GND) are accessible</label>
+        <label class="check-item"><input type="checkbox"> Test with QEMU first (make test)</label>
+        <label class="check-item"><input type="checkbox"> Build with correct defconfig for target</label>
+        <label class="check-item"><input type="checkbox"> Verify boot shim compatibility with SoC</label>
+        <label class="check-item"><input type="checkbox"> Flash via U-Boot tftpboot or serial</label>
+        <label class="check-item"><input type="checkbox"> Monitor serial output during first boot</label>
+        <label class="check-item"><input type="checkbox"> Verify XIP-USERSPACE-OK marker appears</label>
+        <label class="check-item"><input type="checkbox"> Test poweroff/reboot cycle</label>
+      </div>
+
+      <h3>Serial Console Setup</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" data-target="serial-cmd">Copy</button>
+        </div>
+        <pre id="serial-cmd"><code># Connect USB-to-serial adapter to router UART pins
+# TX → RX, RX → TX, GND → GND
+
+# Linux
+sudo screen /dev/ttyUSB0 115200
+
+# Or with minicom
+sudo minicom -D /dev/ttyUSB0 -b 115200
+
+# Or with picocom
+sudo picocom -b 115200 /dev/ttyUSB0</code></pre>
+      </div>
+    </section>
+
+    <!-- Section: Testing -->
+    <section id="testing" class="doc-section">
+      <h2>Test Infrastructure</h2>
+      <p>Two test scripts verify the XIP implementation: static layout assertions and dynamic boot testing.</p>
+
+      <h3>Static Verification (verify-layout.py)</h3>
+      <p>Uses <code>readelf</code> and <code>System.map</code> to verify ELF layout without booting:</p>
+      <ol class="numbered-list">
+        <li>A LOAD segment with <strong>VMA == LMA == 0x9FC01000</strong>, flags <code>R E</code> (true XIP)</li>
+        <li>A RAM segment whose LMA lies inside the ROM image (data shipped in flash)</li>
+        <li>All uasm buffers at RAM addresses</li>
+        <li>All trampolines in ROM</li>
+        <li>ROM image fits within flash budget</li>
+      </ol>
+
+      <h3>Boot Smoke Test (smoke-test.py)</h3>
+      <p>Boots the image in QEMU and asserts serial markers appear in order:</p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">python</span>
+          <button class="copy-btn" data-target="smoke-test">Copy</button>
+        </div>
+        <pre id="smoke-test"><code>#!/usr/bin/env python3
+"""QEMU boot smoke test for XIP kernel."""
+import subprocess, sys, time
+
+MARKERS = [
+    "Linux version",        # kernel alive
+    "Memory:",              # memblock accounting sane
+    "Freeing unused kernel",# init memory reclaim worked
+    "XIP-USERSPACE-OK",     # PID 1 ELF executed
+    "XIP-POWEROFF:",        # userspace reached poweroff
+]
+
+def test():
+    proc = subprocess.Popen(
+        ["qemu-system-mipsel", "-M", "malta", "-m", "256M",
+         "-nographic", "-bios", "build/out/xip-bios.bin",
+         "-no-reboot", "-serial", "mon:stdio"],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True
+    )
+    output = []
+    found = 0
+    deadline = time.time() + 30
+
+    while time.time() &lt; deadline:
+        line = proc.stdout.readline()
+        if not line:
+            break
+        output.append(line)
+        if found &lt; len(MARKERS) and MARKERS[found] in line:
+            found += 1
+        if "XIP-POWEROFF" in line:
+            break
+
+    proc.wait(timeout=10)
+    output_text = "".join(output)
+
+    if found == len(MARKERS) and proc.returncode == 0:
+        print("PASS: all markers found, clean poweroff")
+        sys.exit(0)
+    else:
+        print(f"FAIL: found {found}/{len(MARKERS)} markers")
+        sys.exit(1)</code></pre>
+      </div>
+    </section>
+
+    <!-- Section: CI/CD -->
+    <section id="ci-cd" class="doc-section">
+      <h2>CI/CD Pipeline</h2>
+      <p>GitHub Actions runs the full build + test pipeline on every push and pull request.</p>
+
+      <h3>Pipeline Stages</h3>
+      <div class="pipeline">
+        <div class="pipeline-step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <strong>Setup</strong>
+            <p>Install clang, lld, llvm, binutils-mipsel-linux-gnu, qemu-system-mips, flex, bison on ubuntu-24.04</p>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <strong>Cache</strong>
+            <p>Cache kernel tarball to avoid re-downloading</p>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <strong>Build</strong>
+            <p><code>make</code> — full pipeline</p>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <strong>Verify</strong>
+            <p><code>make verify</code> — static assertions</p>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step">
+          <div class="step-number">5</div>
+          <div class="step-content">
+            <strong>Test</strong>
+            <p><code>make test</code> — QEMU boot smoke test</p>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step">
+          <div class="step-number">6</div>
+          <div class="step-content">
+            <strong>Artifacts</strong>
+            <p>Upload <code>xip-bios.bin</code> and <code>boot.log</code></p>
+          </div>
+        </div>
+      </div>
+
+      <h3>ci.yml Configuration</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">yaml</span>
+          <button class="copy-btn" data-target="ci-yaml">Copy</button>
+        </div>
+        <pre id="ci-yaml"><code>name: Build & Test
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y clang lld llvm \
+            binutils-mipsel-linux-gnu \
+            qemu-system-mips flex bison bc
+
+      - name: Cache kernel tarball
+        uses: actions/cache@v4
+        with:
+          path: build/linux-*.tar.xz
+          key: kernel-${{ hashFiles('patches/*') }}
+
+      - name: Build
+        run: make
+
+      - name: Verify layout
+        run: make verify
+
+      - name: Boot test
+        run: make test
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: xip-kernel
+          path: |
+            build/out/xip-bios.bin
+            build/boot.log</code></pre>
+      </div>
+    </section>
+
+    <!-- Section: Verification -->
+    <section id="verification" class="doc-section">
+      <h2>Verification</h2>
+      <p>Verification happens at multiple levels to ensure correctness.</p>
+
+      <h3>Verification Levels</h3>
+      <table>
+        <thead>
+          <tr><th>Level</th><th>Tool</th><th>What It Checks</th><th>When</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Compile-time</td><td>gcc/clang warnings</td><td>Syntax, type errors, warnings</td><td>During build</td></tr>
+          <tr><td>Link-time</td><td>ld assertions</td><td>Shim size ≤ 4 KiB, symbol resolution</td><td>During link</td></tr>
+          <tr><td>Static layout</td><td>verify-layout.py</td><td>ELF segments, XIP addresses, ROM/RAM split</td><td>After build</td></tr>
+          <tr><td>Boot test</td><td>smoke-test.py</td><td>Kernel boots, init runs, poweroff succeeds</td><td>After build</td></tr>
+          <tr><td>CI</td><td>GitHub Actions</td><td>Full pipeline on every push</td><td>On commit</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Section: File Reference -->
+    <section id="file-reference" class="doc-section">
+      <h2>File Reference</h2>
+      <p>Complete reference of all project files.</p>
+
+      <table>
+        <thead>
+          <tr><th>File</th><th>Lines</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Makefile</code></td><td>41</td><td>Top-level build orchestration</td></tr>
+          <tr><td><code>README.md</code></td><td>154</td><td>Project documentation</td></tr>
+          <tr><td><code>configs/xip_qemu_malta_defconfig</code></td><td>82</td><td>Minimal XIP kernel config</td></tr>
+          <tr><td><code>configs/lwrt_qemu_malta_defconfig</code></td><td>123</td><td>LWRT router config with networking</td></tr>
+          <tr><td><code>patches/0001-mips-add-xip-kconfig.patch</code></td><td>53</td><td>Kconfig additions</td></tr>
+          <tr><td><code>patches/0002-mips-xip-linker-script.patch</code></td><td>293</td><td>XIP linker script (largest patch)</td></tr>
+          <tr><td><code>patches/0003-mips-head-xip-data-copy.patch</code></td><td>36</td><td>head.S data copy loop</td></tr>
+          <tr><td><code>patches/0004-mips-setup-xip-memblock.patch</code></td><td>52</td><td>Memblock accounting fixes</td></tr>
+          <tr><td><code>patches/0005-mips-mm-xip-patchable-text.patch</code></td><td>265</td><td>TLB handlers + RAM buffers</td></tr>
+          <tr><td><code>scripts/build-kernel.sh</code></td><td>53</td><td>Kernel download/patch/compile</td></tr>
+          <tr><td><code>scripts/build-image.sh</code></td><td>59</td><td>Flash image assembly</td></tr>
+          <tr><td><code>scripts/build-userspace.sh</code></td><td>62</td><td>Initramfs generation</td></tr>
+          <tr><td><code>scripts/run-qemu.sh</code></td><td>8</td><td>Interactive QEMU launch</td></tr>
+          <tr><td><code>shim/shim.S</code></td><td>86</td><td>Boot shim assembly</td></tr>
+          <tr><td><code>shim/shim.ld</code></td><td>22</td><td>4 KiB linker script</td></tr>
+          <tr><td><code>userspace/init.c</code></td><td>65</td><td>Freestanding PID 1</td></tr>
+          <tr><td><code>tests/verify-layout.py</code></td><td>106</td><td>Static ELF layout verification</td></tr>
+          <tr><td><code>tests/smoke-test.py</code></td><td>109</td><td>QEMU boot smoke test</td></tr>
+          <tr><td><code>.github/workflows/ci.yml</code></td><td>46</td><td>GitHub Actions CI pipeline</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Section: Glossary -->
+    <section id="glossary" class="doc-section">
+      <h2>Glossary</h2>
+      <dl class="glossary">
+        <dt>XIP (Execute-In-Place)</dt>
+        <dd>Executing code directly from non-volatile storage without copying to RAM first.</dd>
+
+        <dt>SPI-NOR Flash</dt>
+        <dd>Serial Peripheral Interface NOR flash memory. Common in embedded systems for firmware storage.</dd>
+
+        <dt>UASM</dt>
+        <dd>MIPS assembly DSL (Domain-Specific Language) used by Linux kernel to generate TLB handlers at boot.</dd>
+
+        <dt>TLB (Translation Lookaside Buffer)</dt>
+        <dd>Hardware cache for virtual-to-physical address translations in MIPS MMU.</dd>
+
+        <dt>KSEG0 / KSEG1</dt>
+        <dd>MIPS direct-mapped address segments. KSEG0 is cached, KSEG1 is uncached. Both map to physical 0x0–0x1FFFFFFF.</dd>
+
+        <dt>GT-64120</dt>
+        <dd>Galileo GT-64120 system controller used in MIPS Malta development boards (and QEMU emulation).</dd>
+
+        <dt>YAMON</dt>
+        <dd>Yet Another Monitor — MIPS bootloader/debugger. The boot shim fakes its protocol.</dd>
+
+        <dt>Memblock</dt>
+        <dd>Linux kernel's early memory allocator. Tracks available and reserved memory regions.</dd>
+
+        <dt>Initramfs</dt>
+        <dd>Initial RAM filesystem — a cpio archive loaded into memory at boot, used as the root filesystem.</dd>
+
+        <dt>nftables</dt>
+        <dd>Modern Linux packet filtering framework, replacing iptables.</dd>
+
+        <dt>LWRT</dt>
+        <dd>Lightweight Router Toolkit — a minimal router firmware userspace for embedded Linux.</dd>
+
+        <dt>OpenWrt</dt>
+        <dd>Linux distribution for embedded networking devices. Provides package management and web interface.</dd>
+
+        <dt>Device Tree (DTB)</dt>
+        <dd>Hardware description data structure passed to the kernel at boot, describing board configuration.</dd>
+
+        <dt>U-Boot</dt>
+        <dd>Universal Bootloader — the most common bootloader for embedded Linux systems.</dd>
+
+        <dt>DTB (Device Tree Blob)</dt>
+        <dd>Binary format of the device tree, passed from bootloader to kernel.</dd>
+      </dl>
+    </section>
+
+    <!-- Section: FAQ -->
+    <section id="faq" class="doc-section">
+      <h2>Frequently Asked Questions</h2>
+
+      <div class="faq-list">
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false">
+            <span>Why use XIP instead of compressed kernel in RAM?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>On devices with 8–16 MiB RAM, a compressed kernel still needs ~2.3 MiB for the decompressed copy. XIP eliminates this entirely, freeing that RAM for applications, network buffers, and sensor data. The tradeoff is slightly slower execution from flash vs. RAM.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false">
+            <span>Does XIP work with any flash type?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>XIP works best with SPI-NOR flash because it supports random access and has consistent read latency. SPI-NAND flash requires ECC management and bad-block handling that makes XIP impractical. Parallel NOR flash also supports XIP but is less common in modern designs.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false">
+            <span>Can I add more features to the minimal config?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>Yes. The LWRT defconfig demonstrates enabling networking, nftables, and drivers while keeping XIP. Use <code>make menuconfig</code> in the kernel source tree to toggle features. Each addition increases kernel size and RAM usage.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false">
+            <span>How do I port this to a different MIPS board?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>1) Create a new defconfig for your board. 2) Modify the boot shim to initialize your board's system controller. 3) Update <code>CONFIG_XIP_PHYS_ADDR</code> to match your flash's physical address. 4) Adjust the linker script if your board has different memory geometry. 5) Test with QEMU first if possible.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false">
+            <span>What is the performance impact of XIP?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>Flash reads are slower than RAM (~50 MB/s vs ~800 MB/s for DDR1). However, most kernel code is execution-bound, not bandwidth-bound. Real-world benchmarks show 5–15% slowdown for typical router workloads (NAT, firewall rules, packet forwarding). The RAM savings often outweigh this cost.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false">
+            <span>Does this support SMP (Symmetric Multi-Processing)?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>Currently no. The XIP implementation requires <code>!SMP</code> because TLB handler generation and cross-segment trampolines assume single-core execution. Adding SMP support would require significant additional work for cache coherency and TLB shootdown across cores.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="doc-footer">
+      <div class="footer-content">
+        <p>MIPS XIP Kernel Documentation · Linux 6.12.34 · GPL-2.0</p>
+        <p>Built for TP-Link Archer C54 and MIPS embedded systems</p>
+      </div>
+    </footer>
+  </main>
+
+  <!-- Back to Top -->
+  <button id="backToTop" class="back-to-top" aria-label="Back to top">↑</button>
+
+  <script src="script.js"></script>
+</body>
+</html>
