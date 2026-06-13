@@ -1,4 +1,5 @@
 # linux-mips-xip — Execute-In-Place Linux kernel for MIPS
+![Build Status](https://github.com/mr-ds-ml-85/mips-xip-kernel/actions/workflows/ci.yml/badge.svg)
 
 A working implementation of `CONFIG_XIP_KERNEL` for `arch/mips` on
 **Linux 6.12.34**, booting in QEMU malta with the kernel's code
